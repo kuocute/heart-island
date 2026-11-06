@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#69b8cf" />
+    <meta name="description" content="心衰照護島：給心衰竭病友與家屬的照護練習遊戲（原型）" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2369b8cf'/%3E%3Cpath d='M16 26C5 18 8 8 13 9c2 .4 3 2 3 3 0-1 1-2.6 3-3 5-1 8 9-3 17Z' fill='%23fff'/%3E%3C/svg%3E" />
+    <title>心衰照護島</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#station-list-open">跳到清單與搜尋</a>
+
+    <div id="app">
+      <header class="topbar" id="topbar">
+        <h1 class="brand"><span aria-hidden="true" class="brand-mark">♥</span>心衰照護島</h1>
+        <button class="role-chip" id="role-chip" type="button" hidden></button>
+        <button class="icon-btn" id="more-open" type="button" aria-haspopup="dialog" aria-controls="more-panel">
+          <span aria-hidden="true">⋯</span><span class="sr-only">更多：設定、重置與醫療人員說明</span>
+        </button>
+      </header>
+
+      <main id="map" class="map" aria-label="島嶼地圖">
+        <div id="game" class="game" aria-hidden="true"></div>
+        <div id="labels" class="labels" role="group" aria-label="地圖上的站點"></div>
+        <div id="zone-signs" class="zone-signs" aria-hidden="true"></div>
+        <div class="zoom" role="group" aria-label="地圖工具">
+          <button class="icon-btn" type="button" id="zoom-in"><span aria-hidden="true">＋</span><span class="sr-only">放大</span></button>
+          <button class="icon-btn" type="button" id="zoom-out"><span aria-hidden="true">－</span><span class="sr-only">縮小</span></button>
+          <button class="icon-btn link-toggle" type="button" id="links-btn" aria-pressed="false"><span aria-hidden="true">🔗</span><span class="sr-only">顯示照護串聯線</span></button>
+        </div>
+        <div id="phase-chip" class="phase-chip" hidden></div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </main>
+
+      <nav class="toolbar" id="toolbar" aria-label="主要操作">
+        <button type="button" id="panorama-btn" class="tool"><span aria-hidden="true" class="tool-ico">🏝</span>全景</button>
+        <button type="button" id="avatar-btn" class="tool"><span aria-hidden="true" class="tool-ico">🧍</span>角色</button>
+        <button type="button" id="station-list-open" class="tool" aria-haspopup="dialog"><span aria-hidden="true" class="tool-ico">🔍</span>清單</button>
+        <button type="button" id="timeline-btn" class="tool" aria-haspopup="dialog"><span aria-hidden="true" class="tool-ico">🕒</span>時間</button>
+      </nav>
+    </div>
+
+    <!-- 開場 -->
+    <section id="intro" class="intro" aria-labelledby="intro-title">
+      <div class="intro-card">
+        <p class="intro-kicker">心衰竭照護旅程</p>
+        <h2 id="intro-title">心衰照護島</h2>
+        <p>從入院到出院，再回到家。走過 14 座小島，練習說出身體變化、看懂出院資料、量體重、按時吃藥、低鹽飲食，也聊聊照顧安排與心裡在意的事。</p>
+        <ul class="intro-zones">
+          <li><span class="zone-dot hospital" aria-hidden="true"></span><strong>住院區</strong>　入院到出院・醫護人員可查看規範</li>
+          <li><span class="zone-dot home" aria-hidden="true"></span><strong>居家區</strong>　病友與家屬的居家衛教與照護</li>
+        </ul>
+        <p class="intro-note">這是練習用的原型，不能取代醫療團隊的評估與說明。</p>
+        <button type="button" id="start-btn" class="btn btn-primary btn-lg">開始探索</button>
+      </div>
+    </section>
+
+    <div id="error-banner" class="error-banner" role="alert" hidden></div>
+    <div id="modal-root"></div>
+  </body>
+  <script type="module" src="/src/main.ts"></script>
+</html>

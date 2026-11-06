@@ -1,0 +1,216 @@
+{
+  "station-admission": {
+    "file": "assets/station-admission.svg",
+    "width": 300,
+    "height": 230,
+    "originX": 0.5,
+    "originY": 0.8696
+  },
+  "station-discharge": {
+    "file": "assets/station-discharge.svg",
+    "width": 300,
+    "height": 200,
+    "originX": 0.5,
+    "originY": 0.85
+  },
+  "station-weight": {
+    "file": "assets/station-weight.svg",
+    "width": 200,
+    "height": 180,
+    "originX": 0.5,
+    "originY": 0.8778
+  },
+  "station-warning": {
+    "file": "assets/station-warning.svg",
+    "width": 180,
+    "height": 280,
+    "originX": 0.5111,
+    "originY": 0.9214
+  },
+  "station-long-term-care": {
+    "file": "assets/station-long-term-care.svg",
+    "width": 300,
+    "height": 210,
+    "originX": 0.5,
+    "originY": 0.8857
+  },
+  "station-palliative": {
+    "file": "assets/station-palliative.svg",
+    "width": 240,
+    "height": 190,
+    "originX": 0.5,
+    "originY": 0.8947
+  },
+  "station-advanced-hf": {
+    "file": "assets/station-advanced-hf.svg",
+    "width": 330,
+    "height": 230,
+    "originX": 0.5,
+    "originY": 0.8957
+  },
+  "decor-hospital": {
+    "file": "assets/decor-hospital.svg",
+    "width": 240,
+    "height": 260,
+    "originX": 0.5,
+    "originY": 0.9077
+  },
+  "station-ward": {
+    "file": "assets/station-ward.svg",
+    "width": 280,
+    "height": 210,
+    "originX": 0.5,
+    "originY": 0.8857
+  },
+  "station-team": {
+    "file": "assets/station-team.svg",
+    "width": 260,
+    "height": 210,
+    "originX": 0.5,
+    "originY": 0.8857
+  },
+  "station-discharge-prep": {
+    "file": "assets/station-discharge-prep.svg",
+    "width": 260,
+    "height": 210,
+    "originX": 0.5,
+    "originY": 0.8857
+  },
+  "station-medication": {
+    "file": "assets/station-medication.svg",
+    "width": 230,
+    "height": 200,
+    "originX": 0.5,
+    "originY": 0.89
+  },
+  "station-diet": {
+    "file": "assets/station-diet.svg",
+    "width": 240,
+    "height": 190,
+    "originX": 0.5,
+    "originY": 0.8947
+  },
+  "station-activity": {
+    "file": "assets/station-activity.svg",
+    "width": 240,
+    "height": 190,
+    "originX": 0.5,
+    "originY": 0.8947
+  },
+  "station-follow-up": {
+    "file": "assets/station-follow-up.svg",
+    "width": 260,
+    "height": 220,
+    "originX": 0.5,
+    "originY": 0.8909
+  },
+  "hut-0": {
+    "file": "assets/hut-0.svg",
+    "width": 56,
+    "height": 58,
+    "originX": 0.5,
+    "originY": 0.8966
+  },
+  "hut-1": {
+    "file": "assets/hut-1.svg",
+    "width": 56,
+    "height": 58,
+    "originX": 0.5,
+    "originY": 0.8966
+  },
+  "hut-2": {
+    "file": "assets/hut-2.svg",
+    "width": 56,
+    "height": 58,
+    "originX": 0.5,
+    "originY": 0.8966
+  },
+  "hut-3": {
+    "file": "assets/hut-3.svg",
+    "width": 56,
+    "height": 58,
+    "originX": 0.5,
+    "originY": 0.8966
+  },
+  "mascot": {
+    "file": "assets/mascot.svg",
+    "frameWidth": 40,
+    "frameHeight": 44
+  },
+  "tree-round": {
+    "file": "assets/tree-round.svg",
+    "width": 50,
+    "height": 64,
+    "originX": 0.5,
+    "originY": 0.9375
+  },
+  "tree-pine": {
+    "file": "assets/tree-pine.svg",
+    "width": 44,
+    "height": 72,
+    "originX": 0.5,
+    "originY": 0.9444
+  },
+  "boat": {
+    "file": "assets/boat.svg",
+    "width": 90,
+    "height": 60,
+    "originX": 0.5,
+    "originY": 0.8333
+  },
+  "wave": {
+    "file": "assets/wave.svg",
+    "width": 40,
+    "height": 12,
+    "originX": 0.5,
+    "originY": 0.5
+  },
+  "avatar-patient": {
+    "file": "assets/avatar-patient.svg",
+    "frameWidth": 40,
+    "frameHeight": 56,
+    "rows": [
+      "down",
+      "left",
+      "right",
+      "up"
+    ],
+    "frames": [
+      "stand",
+      "walk1",
+      "walk2"
+    ]
+  },
+  "avatar-caregiver": {
+    "file": "assets/avatar-caregiver.svg",
+    "frameWidth": 40,
+    "frameHeight": 56,
+    "rows": [
+      "down",
+      "left",
+      "right",
+      "up"
+    ],
+    "frames": [
+      "stand",
+      "walk1",
+      "walk2"
+    ]
+  },
+  "avatar-staff": {
+    "file": "assets/avatar-staff.svg",
+    "frameWidth": 40,
+    "frameHeight": 56,
+    "rows": [
+      "down",
+      "left",
+      "right",
+      "up"
+    ],
+    "frames": [
+      "stand",
+      "walk1",
+      "walk2"
+    ]
+  }
+}

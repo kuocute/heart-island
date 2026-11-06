@@ -1,0 +1,30 @@
+{
+  "name": "hf-care-island",
+  "private": true,
+  "version": "0.1.0",
+  "description": "心衰照護島：心衰竭病友與家屬的照護練習網頁遊戲（原型）",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:e2e": "node scripts/e2e.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "assets": "node scripts/gen-assets.mjs",
+    "staff-server": "node staff-server/server.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0",
+    "playwright-core": "1.56.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "3.2.7"
+  }
+}

@@ -1,0 +1,129 @@
+import { describe, expect, it } from 'vitest';
+import { STATIONS } from '../src/content/stations';
+import { STATION_IDS, validateLinks, validateStations } from '../src/content/validate';
+import { CARE_LINKS, PHASES } from '../src/content/links';
+import { searchStations } from '../src/content/search';
+import { EDGES, NODES, START_NODE, TILES } from '../src/game/mapData';
+import { Navigator, shortestPath, type NavEvent } from '../src/game/navigation';
+import { ProgressStore, STORAGE_KEY, stationStatus } from '../src/state/progress';
+import type { Station } from '../src/content/types';
+
+const graph = { nodes: NODES, edges: EDGES };
+
+describe('衛教內容驗證', () => {
+  it('14 站內容、串聯線、照護階段通過驗證', () => {
+    expect(validateStations(STATIONS, new Set(Object.keys(NODES)))).toEqual([]);
+    expect(validateLinks(CARE_LINKS, PHASES, STATIONS)).toEqual([]);
+    expect(STATIONS).toHaveLength(14);
+    expect(STATIONS.filter((s) => s.zone === 'hospital').map((s) => s.id)).toEqual(['admission', 'ward', 'team', 'discharge-prep', 'discharge']);
+    expect(STATIONS.map((s) => s.id).sort()).toEqual([...STATION_IDS].sort());
+  });
+  it('quiz 缺正確選項、sequence 順序不完整、reflection 有正解都會被擋下', () => {
+    const bad = structuredClone(STATIONS) as Station[];
+    const quiz = bad[0].missions[0] as unknown as Record<string, unknown>;
+    quiz.correctChoiceId = 'nope';
+    const seq = bad.find((s) => s.id === 'weight')!.missions[0] as unknown as Record<string, unknown>;
+    seq.correctOrder = ['measure'];
+    const refl = bad.find((s) => s.id === 'long-term-care')!.missions[0] as unknown as Record<string, unknown>;
+    refl.correctChoiceId = 'daily';
+    const errs = validateStations(bad).join('\n');
+    expect(errs).toContain('correctChoiceId「nope」');
+    expect(errs).toContain('correctOrder 必須剛好包含');
+    expect(errs).toContain('反思題不可有正確答案');
+  });
+  it('進階醫療港有兩個展館任務並先選展館', () => {
+    const adv = STATIONS.find((s) => s.id === 'advanced-hf')!;
+    expect(adv.missions).toHaveLength(2);
+    expect(adv.pickMission).toBeTruthy();
+  });
+  it('住院區每站都有醫護規範卡，查詢文字要求列出來源並標示待確認', () => {
+    for (const s of STATIONS.filter((x) => x.zone === 'hospital')) expect(s.staff?.query).toMatch(/來源、版本與頁碼.*待確認/);
+    for (const s of STATIONS) if (s.staff) expect(s.staff.query).toMatch(/待確認/);
+  });
+  it('搜尋可用俗稱找到照護重點', () => {
+    const r = searchStations(STATIONS, '腳腫');
+    expect(r.some((x) => x.station.id === 'warning' && x.item?.id === 'observe')).toBe(true);
+    expect(searchStations(STATIONS, '藥盒').some((x) => x.station.id === 'medication')).toBe(true);
+    expect(searchStations(STATIONS, '')).toEqual([]);
+  });
+  it('串聯線把住院區連到居家區', () => {
+    const cross = CARE_LINKS.filter((l) => STATIONS.find((s) => s.id === l.from.station)!.zone !== STATIONS.find((s) => s.id === l.to.station)!.zone);
+    expect(cross.length).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('步道路網', () => {
+  it('每一站入口都能從起點走到', () => {
+    for (const s of STATIONS) expect(shortestPath(graph, START_NODE, s.entryNodeId)).not.toBeNull();
+    for (const id of STATION_IDS) expect(TILES.some((t) => t.id === id)).toBe(true);
+  });
+  it('從住院區到居家區要經過出院橋', () => {
+    const p = shortestPath(graph, START_NODE, 'weight')!;
+    expect(p).toContain('discharge:L');
+    expect(p).toContain('medication:L');
+    expect(p.at(-1)).toBe('weight');
+  });
+  it('走路途中連續點兩個不同站，只抵達最後選擇的站，且先走完目前這一段', () => {
+    const events: NavEvent[] = [];
+    const nav = new Navigator(graph, 'admission', 200, (e) => events.push(e));
+    nav.goTo('discharge', 'discharge');
+    nav.update(100); // 走在 admission→stairsTop 這段
+    const seg = nav.segment;
+    expect(seg?.from).toBe('admission');
+    nav.goTo('warning', 'warning');
+    nav.goTo('palliative', 'palliative');
+    expect(nav.segment).toEqual(seg); // 目前這段不中斷
+    for (let i = 0; i < 1200; i++) nav.update(50);
+    const arrivals = events.filter((e) => e.type === 'arrive');
+    expect(arrivals).toEqual([{ type: 'arrive', stationId: 'palliative' }]);
+    expect(nav.node).toBe('palliative');
+  });
+  it('減少動態效果：直接抵達', () => {
+    const events: NavEvent[] = [];
+    const nav = new Navigator(graph, 'admission', 200, (e) => events.push(e));
+    nav.goTo('weight', 'weight', { instant: true });
+    expect(events.at(-1)).toEqual({ type: 'arrive', stationId: 'weight' });
+    expect(nav.pos).toEqual(NODES.weight);
+  });
+});
+
+describe('探索狀態', () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), m };
+  };
+  it('儲存、重新載入、重置', () => {
+    const st = mem();
+    const a = new ProgressStore(STATION_IDS, st);
+    a.setRole('caregiver');
+    a.markExplored('discharge');
+    a.setPracticed('discharge', 'discharge-followup', true);
+    const b = new ProgressStore(STATION_IDS, st);
+    expect(b.role).toBe('caregiver');
+    expect(b.station('discharge').practiced).toEqual(['discharge-followup']);
+    b.reset();
+    expect(st.m.has(STORAGE_KEY)).toBe(false);
+    expect(new ProgressStore(STATION_IDS, st).role).toBeNull();
+  });
+  it('只存允許的欄位', () => {
+    const st = mem();
+    const a = new ProgressStore(STATION_IDS, st);
+    a.setRole('patient');
+    a.setPracticed('weight', 'weight-card', true);
+    const saved = JSON.parse(st.m.get(STORAGE_KEY)!);
+    expect(Object.keys(saved).sort()).toEqual(['lastStation', 'role', 'stations', 'version']);
+    expect(Object.keys(saved.stations.weight).sort()).toEqual(['explored', 'practiced']);
+  });
+  it('儲存失敗仍可遊玩', () => {
+    const broken = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('quota'); }, removeItem: () => {} };
+    const a = new ProgressStore(STATION_IDS, broken);
+    a.setRole('patient');
+    expect(a.saveOk).toBe(false);
+    expect(a.role).toBe('patient');
+  });
+  it('站點狀態', () => {
+    expect(stationStatus({ explored: false, practiced: [] }, ['a'])).toBe('new');
+    expect(stationStatus({ explored: true, practiced: [] }, ['a'])).toBe('explored');
+    expect(stationStatus({ explored: true, practiced: ['a'] }, ['a'])).toBe('practiced');
+  });
+});
