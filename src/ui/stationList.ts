@@ -1,4 +1,4 @@
-// 清單：關鍵字搜尋＋依住院區／居家區列出 14 站與探索狀態。從清單可直接開啟任務，不必等待角色走路動畫。
+// 清單：關鍵字搜尋＋依住院區／居家區列出所有站點與探索狀態。從清單可直接開啟任務，不必等待角色走路動畫。
 import { searchStations } from '../content/search';
 import type { Station, StationId } from '../content/types';
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
@@ -9,6 +9,8 @@ export function statusOf(station: Station, progress: ProgressStore) {
   const ids = station.missions.map((m) => m.id);
   const st = stationStatus(p, ids);
   const n = ids.filter((id) => p.practiced.includes(id)).length;
+  // 有衛教卡的站：答對情境題即「已完成」
+  if (station.card) return { st, n, total: ids.length, text: st === 'practiced' ? '已完成' : STATUS_TEXT[st] };
   return { st, n, total: ids.length, text: `${STATUS_TEXT[st]}${n ? `・已練習 ${n}／${ids.length}` : ''}` };
 }
 

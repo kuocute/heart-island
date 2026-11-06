@@ -308,7 +308,7 @@ export class IslandScene {
     bake(paths, () => true);
   }
 
-  /** 巡島小人偶「心心」：依 01→14 的順序沿步道巡島，每到一站揮手 */
+  /** 巡島小人偶「心心」：依 01→05 → 返家照護站 → 06→14 的順序沿步道巡島，每到一站揮手 */
   private buildMascot(tex: THREE.Texture) {
     const order = TILES.filter((t) => !t.id.startsWith('decor')).sort((a, b) => order01(a.id) - order01(b.id)).map((t) => t.id as string);
     const g = { nodes: NODES, edges: EDGES };
@@ -723,5 +723,5 @@ export class IslandScene {
   toScreen(x: number, y: number, h = 0) { return this.project(x, h, y); }
 }
 
-const ORDER = ['admission', 'ward', 'team', 'discharge-prep', 'discharge', 'weight', 'medication', 'diet', 'activity', 'warning', 'follow-up', 'long-term-care', 'palliative', 'advanced-hf'];
+const ORDER = ['admission', 'ward', 'team', 'discharge-prep', 'discharge', 'home-care', 'weight', 'medication', 'diet', 'activity', 'warning', 'follow-up', 'long-term-care', 'palliative', 'advanced-hf'];
 function order01(id: string) { return ORDER.indexOf(id); }

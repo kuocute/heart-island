@@ -11,10 +11,10 @@ import type { Station } from '../src/content/types';
 const graph = { nodes: NODES, edges: EDGES };
 
 describe('衛教內容驗證', () => {
-  it('14 站內容、串聯線、照護階段通過驗證', () => {
+  it('15 站內容、串聯線、照護階段通過驗證', () => {
     expect(validateStations(STATIONS, new Set(Object.keys(NODES)))).toEqual([]);
     expect(validateLinks(CARE_LINKS, PHASES, STATIONS)).toEqual([]);
-    expect(STATIONS).toHaveLength(14);
+    expect(STATIONS).toHaveLength(15);
     expect(STATIONS.filter((s) => s.zone === 'hospital').map((s) => s.id)).toEqual(['admission', 'ward', 'team', 'discharge-prep', 'discharge']);
     expect(STATIONS.map((s) => s.id).sort()).toEqual([...STATION_IDS].sort());
   });
@@ -30,6 +30,18 @@ describe('衛教內容驗證', () => {
     expect(errs).toContain('correctChoiceId「nope」');
     expect(errs).toContain('correctOrder 必須剛好包含');
     expect(errs).toContain('反思題不可有正確答案');
+  });
+  it('返家照護站：衛教卡＋一題知識題，標示待照護團隊審閱', () => {
+    const hc = STATIONS.find((s) => s.id === 'home-care')!;
+    expect(hc.card?.points.length).toBeGreaterThan(0);
+    expect(hc.review).toBe('pending');
+    expect(hc.missions).toHaveLength(1);
+    expect(hc.missions[0].interaction).toBe('quiz');
+    // 有衛教卡的站多一題會被擋下
+    const bad = structuredClone(STATIONS) as Station[];
+    const b = bad.find((s) => s.id === 'home-care')!;
+    b.missions.push({ ...b.missions[0], id: 'extra' });
+    expect(validateStations(bad).join('\n')).toContain('只能有一個知識題');
   });
   it('進階醫療港有兩個展館任務並先選展館', () => {
     const adv = STATIONS.find((s) => s.id === 'advanced-hf')!;
@@ -57,9 +69,9 @@ describe('步道路網', () => {
     for (const s of STATIONS) expect(shortestPath(graph, START_NODE, s.entryNodeId)).not.toBeNull();
     for (const id of STATION_IDS) expect(TILES.some((t) => t.id === id)).toBe(true);
   });
-  it('心形島：從住院區到居家區要經過心尖的「回家之門」', () => {
+  it('心形島：從住院區到居家區要經過心尖的「返家照護站」', () => {
     const p = shortestPath(graph, 'discharge', 'weight')!;
-    expect(p.some((n) => n.startsWith('decor-gate'))).toBe(true);
+    expect(p.some((n) => n.startsWith('home-care'))).toBe(true);
     expect(p.at(-1)).toBe('weight');
     expect(TILES).toHaveLength(21);
     // 住院區在左、居家區在右

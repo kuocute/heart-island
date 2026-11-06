@@ -4,6 +4,7 @@ import type { CareLink, Phase, Station, StationId } from './types';
 
 export const STATION_IDS: StationId[] = [
   'admission', 'ward', 'team', 'discharge-prep', 'discharge',
+  'home-care',
   'weight', 'medication', 'diet', 'activity', 'warning', 'follow-up', 'long-term-care', 'palliative', 'advanced-hf',
 ];
 
@@ -28,6 +29,11 @@ export function validateStations(stations: Station[], nodeIds?: Set<string>): st
     const itemIds = s.items.map((i) => i.id);
     if (new Set(itemIds).size !== itemIds.length) errors.push(`${where}：照護重點 id 重複`);
     if (s.items.length < 1 || s.items.length > 4) errors.push(`${where}：照護重點建議 1–4 項（島上小建築的數量）`);
+    if (s.card) {
+      if (s.missions.length !== 1 || s.missions[0].interaction !== 'quiz') errors.push(`${where}：有衛教卡的站點只能有一個知識題`);
+      if (!s.card.title.trim() || !s.card.summary.trim()) errors.push(`${where}：衛教卡缺少標題或導言`);
+      if (s.card.points.length < 1 || s.card.points.length > 5) errors.push(`${where}：衛教卡重點需 1–5 項`);
+    }
     for (const it of s.items) if (it.missionId && !s.missions.some((m) => m.id === it.missionId)) errors.push(`${where}：照護重點 ${it.id} 的 missionId「${it.missionId}」不在本站任務中`);
 
     for (const m of s.missions) {
