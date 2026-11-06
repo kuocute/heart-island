@@ -317,7 +317,8 @@ body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
 .map-label[data-station='home-care'] { border-color: var(--coral); }
 .map-label[data-station='home-care'][data-state='practiced'] { border-color: var(--ok); }
 .map-label[data-station='home-care'][data-state='practiced'] .map-label-state { font-size: 0.82rem; font-weight: 800; background: var(--ok-bg); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
-.labels.tiny .map-label[data-station='home-care'] .map-label-state { display: none; }
+/* 縮到最小時其他站只剩站號，返家照護站仍顯示「已完成」 */
+.labels.tiny .map-label[data-station='home-care'][data-state='practiced'] { padding-right: 4px; gap: 4px; }
 .pill.review { background: #fde2d6; color: #8a3a1a; font-weight: 700; }
 .care-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin: 8px 0; }
 .care-card .step-heading { margin-top: 0; }
