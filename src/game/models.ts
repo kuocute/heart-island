@@ -55,6 +55,7 @@ export function windows(w: number, d: number, rows: number[], cols: number, colo
     const t = -span / 2 + ((i + 0.5) * span) / cols;
     const win = box(face === 'front' ? size : 1.2, size, face === 'front' ? 1.2 : size, color, face === 'front' ? { x: t, y, z: d / 2 + 0.4 } : { x: w / 2 + 0.4, y, z: t });
     win.castShadow = false;
+    win.userData.glow = true; // 夜晚會亮
     g.add(win);
   }
   return place(g, o);
@@ -101,6 +102,39 @@ export function personFig(color: THREE.ColorRepresentation, p: Pos = {}) {
   g.add(cyl(3.6, 4.4, 11, 7, color));
   g.add(m(new THREE.IcosahedronGeometry(4, 1).translate(0, 15, 0), '#f5d0b5'));
   return place(g, p);
+}
+
+/** 路燈（夜晚會亮） */
+export function lampPost(p: Pos = {}) {
+  const g = new THREE.Group();
+  g.add(cyl(0.9, 1.1, 22, 5, '#4b5563'));
+  const bulb = m(new THREE.IcosahedronGeometry(3, 0).translate(0, 24, 0), '#fff1b8', {}, false);
+  bulb.userData.glow = true;
+  g.add(bulb);
+  return place(g, p);
+}
+/** 會在步道上走動的小人（顏色隨機） */
+export function walker(color: THREE.ColorRepresentation) {
+  return G(cyl(2.6, 3.2, 8, 6, color), m(new THREE.IcosahedronGeometry(3, 0).translate(0, 11, 0), '#f5d0b5'));
+}
+function textTexture(text: string, bg = '#ffffff', fg = '#2f7f78') {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const x = c.getContext('2d')!;
+  x.fillStyle = bg; x.beginPath(); x.roundRect(4, 4, 504, 120, 40); x.fill();
+  x.strokeStyle = fg; x.lineWidth = 8; x.stroke();
+  x.fillStyle = fg; x.font = 'bold 64px system-ui, "PingFang TC", "Noto Sans TC", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(text, 256, 68);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function heartShape(s: number) {
+  const h = new THREE.Shape();
+  h.moveTo(0, -10 * s);
+  h.bezierCurveTo(-16 * s, 2 * s, -10 * s, 14 * s, 0, 7 * s);
+  h.bezierCurveTo(10 * s, 14 * s, 16 * s, 2 * s, 0, -10 * s);
+  return h;
 }
 
 // ───────── 招牌圖示（畫在 canvas 上，原創向量） ─────────
@@ -308,6 +342,73 @@ export const STATION_MODELS: Record<string, Builder> = {
     box(22, 16, 14, '#fbf7ef', { x: 0, z: -20 }),
     flag('#4f86c6', { x: -62, z: 16 }), flag('#e27c7c', { x: 62, z: 14 }),
   ),
+  'decor-garden': () => G(
+    cyl(16, 18, 4, 10, '#d9d2c4'), cyl(13, 13, 1, 10, '#9fd8ea', { y: 4 }), cyl(3, 4, 12, 8, '#d9d2c4', { y: 4 }), cyl(6, 6, 2, 8, '#bfe6f2', { y: 14 }),
+    bench({ x: -36, z: 20, ry: 0.4 }), bench({ x: 36, z: 20, ry: -0.4 }),
+    flowers({ x: -30, z: -30 }), flowers({ x: 30, z: -34 }), flowers({ x: 0, z: 44 }),
+    tree('round', { x: -62, z: -20 }, 0.9), tree('round', { x: 62, z: -16 }, 0.85, '#6aa956'), tree('pine', { x: 0, z: -66 }, 0.9),
+    lampPost({ x: -22, z: 34 }), lampPost({ x: 22, z: 34 }),
+    personFig('#f2a07c', { x: -14, z: 26 }), personFig('#7cc3d6', { x: 48, z: 40 }),
+  ),
+  'decor-ambulance': () => G(
+    box(56, 26, 36, '#f3f6f8', { x: -20, z: -36 }), box(58, 4, 38, '#7cc3d6', { x: -20, y: 26, z: -36 }),
+    box(30, 18, 1.2, '#cfd8dc', { x: -20, z: -17.6 }),
+    box(34, 16, 16, '#ffffff', { x: 30, z: 6 }), box(34, 3, 16.4, '#ef8354', { x: 30, y: 7 }), box(10, 12, 15, '#cfe8f3', { x: 44, y: 2, z: 0.2 }),
+    m(new THREE.IcosahedronGeometry(2.4, 0).translate(24, 18, 6), '#7cc3ff'),
+    ...[-30, -10, 10].map((x) => box(1.5, 0.4, 26, '#ffffff', { x, z: 30 })),
+    cyl(24, 24, 0.8, 16, '#9aa5ad', { x: -30, z: 40 }),
+    roofIcon('H', '#4b5563', { x: -30, y: 1.2, z: 40 }, 26),
+    lampPost({ x: 58, z: 40 }),
+  ),
+  'decor-park': () => G(
+    cyl(30, 30, 1.2, 9, '#8fd3e2', { x: -10, z: 6 }),
+    tree('round', { x: -60, z: -30 }, 1), tree('pine', { x: -30, z: -60 }, 0.95), tree('round', { x: 30, z: -50 }, 0.9, '#6aa956'),
+    tree('pine', { x: 60, z: -10 }, 0.9), tree('round', { x: 50, z: 40 }, 0.75),
+    bench({ x: -10, z: 46 }), lampPost({ x: 26, z: 30 }), bush({ x: -50, z: 30 }), flowers({ x: 10, z: -24 }),
+    personFig('#a184c8', { x: 24, z: 16 }),
+  ),
+  'decor-heart': () => {
+    const heart = new THREE.Mesh(new THREE.ExtrudeGeometry(heartShape(2.2), { depth: 8, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 1 }), mat('#ef5f67', { emissive: '#ef5f67', emissiveIntensity: 0.15 }));
+    heart.position.set(0, 46, -10);
+    heart.castShadow = true;
+    heart.name = 'heart';
+    heart.userData.keep = true;
+    return G(
+      cyl(26, 30, 6, 12, '#efe6d6'), cyl(14, 16, 22, 8, '#fbf7ef', { y: 6 }), heart,
+      ...[0, 1, 2, 3, 4, 5].map((i) => flowers({ x: Math.cos(i) * 44, z: Math.sin(i) * 34 + 8 })),
+      bench({ x: -50, z: 30, ry: 0.6 }), bench({ x: 50, z: 30, ry: -0.6 }),
+      lampPost({ x: -34, z: -40 }), lampPost({ x: 34, z: -40 }),
+      personFig('#82c29e', { x: -26, z: 44 }), personFig('#f4a7b9', { x: 32, z: 52 }),
+    );
+  },
+  'decor-hill': () => {
+    const hill = m(new THREE.ConeGeometry(70, 46, 8).translate(0, 23, 0), '#9fcf73', { z: -14 });
+    const mill = new THREE.Group();
+    mill.add(cyl(5, 8, 34, 6, '#fffaf0'), pyramid(12, 8, '#c86c49', { y: 34 }));
+    const blades = new THREE.Group();
+    blades.name = 'windmill';
+    blades.userData.keep = true;
+    for (let i = 0; i < 4; i++) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(3, 26, 0.8).translate(0, 13, 0), mat('#ffffff'));
+      b.rotation.z = (i * Math.PI) / 2;
+      b.userData.keep = true;
+      blades.add(b);
+    }
+    blades.position.set(0, 30, 7);
+    mill.add(blades);
+    mill.position.set(0, 44, -14);
+    return G(hill, mill, tree('pine', { x: -58, z: 20 }, 0.85), tree('pine', { x: 60, z: 16 }, 0.9), tree('round', { x: -30, z: 46 }, 0.7), bush({ x: 34, z: 50 }));
+  },
+  'decor-gate': () => {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(56, 14), new THREE.MeshStandardMaterial({ map: textTexture('回家的路'), roughness: 0.9 }));
+    sign.position.set(0, 44, 0.8);
+    return G(
+      box(8, 40, 8, '#c98f5a', { x: -32 }), box(8, 40, 8, '#c98f5a', { x: 32 }), box(76, 7, 10, '#a86d42', { y: 37 }), sign,
+      ...[0, 1, 2, 3].map((i) => box(26, 1.2, 12, '#f3e6c4', { y: 0.2, z: 20 + i * 14 })),
+      flowers({ x: -50, z: 10 }), flowers({ x: 50, z: 10 }), lampPost({ x: -44, z: 40 }), lampPost({ x: 44, z: 40 }),
+      tree('round', { x: -66, z: -30 }, 0.8), tree('round', { x: 66, z: -30 }, 0.8, '#6aa956'),
+    );
+  },
   'decor-hospital': () => G(
     box(52, 110, 46, '#fbfbf7', { x: 0, z: -14 }),
     box(54, 5, 48, '#4fa7a0', { x: 0, y: 110, z: -14 }),

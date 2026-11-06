@@ -298,3 +298,12 @@ body[data-role='staff'] .map-label-staff { background: #2f5f9a; color: #fff; }
 }
 
 .map-label.offscreen { opacity: 0; pointer-events: none; }
+
+/* 標籤極小模式：只顯示站號圓點（名稱仍在無障礙標籤裡），放大後顯示名稱 */
+.labels.tiny .map-label .short, .labels.tiny .map-label .full, .labels.tiny .map-label-staff { display: none; }
+.labels.tiny .map-label { padding: 0; gap: 0; }
+.labels.tiny .map-label::before { border-radius: 50%; }
+.zoom .icon-btn { font-size: 1.25rem; }
+body[data-tod='night'] .zone-sign { background: rgba(30, 44, 74, 0.88); color: #fff; }
+body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
+@media (max-height: 700px) { .zoom { gap: 4px; } .zoom .icon-btn { width: 44px; height: 44px; } }

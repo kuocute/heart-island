@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-*/
+staff-server/data/cards.json
+.env*
+staff-server/data/users.json
+staff-server/data/access.log

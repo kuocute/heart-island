@@ -4,7 +4,7 @@ import { CARE_LINKS, PHASES } from './content/links';
 import { STATIONS } from './content/stations';
 import type { PhaseId, Role, StationId } from './content/types';
 import { STATION_IDS, validateLinks, validateStations } from './content/validate';
-import { IslandScene } from './game/IslandScene';
+import { IslandScene, type TimeOfDay } from './game/IslandScene';
 import { ITEM_SLOTS, NODES, TILES, ZONE_SIGNS, tileHeight, tileOf } from './game/mapData';
 import type { NavEvent } from './game/navigation';
 import { ProgressStore } from './state/progress';
@@ -90,6 +90,7 @@ function layoutLabels() {
   const tools = new DOMRect(zb.left - mapBox.left - 4, zb.top - mapBox.top - 4, zb.width + 8, zb.height + 8);
   const zoom = scene.zoom;
   labelsEl.classList.toggle('compact', zoom < 0.8);
+  labelsEl.classList.toggle('tiny', zoom < 0.42);
   const rows = STATIONS.map((s) => ({ s, p: scene!.labelScreen(s.id) })).sort((a, b) => a.p.y - b.p.y);
   for (const { s, p } of rows) {
     const btn = labelBtns.get(s.id)!;
@@ -333,21 +334,59 @@ $('links-btn').addEventListener('click', toggleLinks);
 $('more-open').addEventListener('click', openMore);
 $('role-chip').addEventListener('click', () => pickRole($('role-chip')));
 $('zoom-in').addEventListener('click', () => scene?.zoomBy(1.25));
+$('rotate-left').addEventListener('click', () => { scene?.rotateBy(-45); announce(status, '視角已向左旋轉。按「全景」可看整座島。'); });
+$('rotate-right').addEventListener('click', () => { scene?.rotateBy(45); announce(status, '視角已向右旋轉。按「全景」可看整座島。'); });
+const TOD: { id: TimeOfDay; ico: string; text: string }[] = [
+  { id: 'morning', ico: '🌅', text: '早晨' }, { id: 'day', ico: '☀️', text: '白天' }, { id: 'night', ico: '🌙', text: '夜晚' },
+];
+let todIndex = 1;
+$('tod-btn').addEventListener('click', () => {
+  todIndex = (todIndex + 1) % TOD.length;
+  const t = TOD[todIndex];
+  scene?.setTimeOfDay(t.id);
+  document.body.dataset.tod = t.id;
+  $('tod-ico').textContent = t.ico;
+  $('tod-label').textContent = `切換時段，目前：${t.text}`;
+  announce(status, `現在是${t.text}。`);
+});
 $('zoom-out').addEventListener('click', () => scene?.zoomBy(0.8));
 
-// ───────── 拖曳與點擊（區分滑動與點選，避免滑動時誤開關卡） ─────────
+// ───────── 拖曳、點擊與雙指手勢（區分滑動與點選，避免滑動時誤開關卡） ─────────
 const mapEl = $('map');
 const DRAG_PX = 10;
 let down: { id: number; x: number; y: number; lx: number; ly: number; dragging: boolean; onCanvas: boolean } | null = null;
 let suppressClick = false;
+const touches = new Map<number, { x: number; y: number }>();
+let pinch: { d: number; a: number } | null = null;
+const pinchInfo = () => {
+  const [p, q] = [...touches.values()];
+  return { d: Math.hypot(q.x - p.x, q.y - p.y), a: Math.atan2(q.y - p.y, q.x - p.x) };
+};
 
 mapEl.addEventListener('pointerdown', (e) => {
-  if (isModalOpen() || !e.isPrimary || (e.target as HTMLElement).closest('.zoom, .phase-chip')) return;
+  if (isModalOpen() || (e.target as HTMLElement).closest('.zoom, .phase-chip')) return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size === 2) {
+    // 第二根手指：改成縮放／旋轉，取消單指拖曳與點擊
+    pinch = pinchInfo();
+    if (down) down.dragging = true;
+    mapEl.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (!e.isPrimary) return;
   const t = e.target as HTMLElement;
   down = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, dragging: false, onCanvas: t instanceof HTMLCanvasElement || t.id === 'labels' || !!t.closest('.zone-signs') };
   suppressClick = false;
 });
 mapEl.addEventListener('pointermove', (e) => {
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && touches.size === 2) {
+    const now = pinchInfo();
+    if (pinch.d > 0) scene?.zoomImmediate(now.d / pinch.d);
+    scene?.rotateBy(-THREE_DEG * (now.a - pinch.a), false);
+    pinch = now;
+    return;
+  }
   if (!down || e.pointerId !== down.id) return;
   if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > DRAG_PX) {
     down.dragging = true;
@@ -360,7 +399,10 @@ mapEl.addEventListener('pointermove', (e) => {
     down.ly = e.clientY;
   }
 });
+const THREE_DEG = 180 / Math.PI;
 const endPointer = (e: PointerEvent) => {
+  touches.delete(e.pointerId);
+  if (touches.size < 2) pinch = null;
   if (!down || e.pointerId !== down.id) return;
   const wasDrag = down.dragging, onCanvas = down.onCanvas;
   down = null;
@@ -389,6 +431,7 @@ window.__hfIsland = {
   get destination() { return scene?.destination ?? null; },
   get moving() { return scene?.isMoving ?? false; },
   get zoom() { return scene ? scene.zoom : null; },
+  get angle() { return scene ? scene.angle : null; },
   /** 島（建築）中心在視窗中的座標（測試點擊島本體用） */
   buildingPoint(id: StationId) {
     if (!scene) return null;

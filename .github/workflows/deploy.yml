@@ -1,3 +1,6 @@
+# 推送到 main 分支時，自動測試、建置並發布到 GitHub Pages（病友端網頁）。
+# 首次使用：GitHub 專案 → Settings → Pages → Source 選「GitHub Actions」。
+# 注意：GitHub Pages 只能放靜態網頁；醫護規範卡的受保護伺服器（staff-server/）不能放在這裡。
 name: Deploy to GitHub Pages
 
 on:
@@ -25,11 +28,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Build
+      - name: Build（網址為 https://<帳號>.github.io/<專案名稱>/）
         run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
-      - name: Check no internal links
+      - name: 確認發布檔案沒有院內連結
         run: npm run check:bundle
       - uses: actions/upload-pages-artifact@v3
         with:

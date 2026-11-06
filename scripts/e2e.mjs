@@ -262,6 +262,19 @@ try {
     const hutText = await dialog(page).innerText();
     check('8g 點 3D 地圖上的小屋，直接開啟該照護重點', hutText.includes('找到求助方式'), hutText.slice(0, 40));
     await page.keyboard.press('Escape');
+    // 早晨／白天／夜晚與旋轉視角
+    await page.click('#tod-btn');
+    const tod1 = await page.evaluate(() => document.body.dataset.tod);
+    await page.click('#tod-btn');
+    const tod2 = await page.evaluate(() => document.body.dataset.tod);
+    await page.click('#tod-btn');
+    check('8h 時段可切換：夜晚 → 早晨 → 白天', tod1 === 'night' && tod2 === 'morning' && (await page.evaluate(() => document.body.dataset.tod)) === 'day', `${tod1} → ${tod2}`);
+    await page.click('#rotate-right');
+    await page.waitForFunction(() => window.__hfIsland.angle === 45, null, { timeout: 15000 }).catch(() => {});
+    const ang = await page.evaluate(() => window.__hfIsland.angle);
+    await page.click('#rotate-left');
+    await page.waitForFunction(() => window.__hfIsland.angle === 0, null, { timeout: 15000 }).catch(() => {});
+    check('8i 視角可左右旋轉', ang === 45 && (await page.evaluate(() => window.__hfIsland.angle)) === 0, `角度 ${ang}`);
     const roleImg = await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--x') === '' && document.body.dataset.role);
     check('8f 角色已切換為醫護人員', roleImg === 'staff');
     await ctx.close();

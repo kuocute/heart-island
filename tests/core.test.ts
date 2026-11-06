@@ -57,11 +57,15 @@ describe('步道路網', () => {
     for (const s of STATIONS) expect(shortestPath(graph, START_NODE, s.entryNodeId)).not.toBeNull();
     for (const id of STATION_IDS) expect(TILES.some((t) => t.id === id)).toBe(true);
   });
-  it('從住院區到居家區要經過出院橋', () => {
-    const p = shortestPath(graph, START_NODE, 'weight')!;
-    expect(p).toContain('discharge:L');
-    expect(p).toContain('medication:L');
+  it('心形島：從住院區到居家區要經過心尖的「回家之門」', () => {
+    const p = shortestPath(graph, 'discharge', 'weight')!;
+    expect(p.some((n) => n.startsWith('decor-gate'))).toBe(true);
     expect(p.at(-1)).toBe('weight');
+    expect(TILES).toHaveLength(21);
+    // 住院區在左、居家區在右
+    const hx = TILES.filter((t) => t.look === 'hospital').map((t) => t.x);
+    const mx = TILES.filter((t) => t.look === 'home').map((t) => t.x);
+    expect(Math.max(...hx)).toBeLessThan(Math.min(...mx));
   });
   it('走路途中連續點兩個不同站，只抵達最後選擇的站，且先走完目前這一段', () => {
     const events: NavEvent[] = [];
