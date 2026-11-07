@@ -6,6 +6,7 @@ import type { PhaseId, Role, StationId } from './content/types';
 import { STATION_IDS, validateLinks, validateStations } from './content/validate';
 import { IslandScene, type TimeOfDay } from './game/IslandScene';
 import { ITEM_SLOTS, NODES, TILES, ZONE_SIGNS, tileHeight, tileOf } from './game/mapData';
+import { WILDLIFE_SPOTS } from './game/wildlife';
 import type { NavEvent } from './game/navigation';
 import { ProgressStore } from './state/progress';
 import { ROLE_TEXT, openMissionDialog } from './ui/missionDialog';
@@ -110,10 +111,67 @@ function layoutLabels() {
     placed.push(new DOMRect(x, y, w, hgt));
     btn.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   }
+  placeWelcome(placed, W, H, tools);
   for (const { el, z } of zoneSigns) {
     const p = scene.toScreen(z.x, z.y, z.h);
     el.style.transform = `translate(${Math.round(p.x - el.offsetWidth / 2)}px, ${Math.round(p.y - el.offsetHeight / 2)}px)`;
   }
+}
+
+// ───────── 第一次進島的引導提示 ─────────
+const welcomeEl = $('welcome');
+const welcomeVisible = () => !welcomeEl.hidden;
+function showWelcome() {
+  if (progress.welcomeSeen) return;
+  welcomeEl.hidden = false;
+  labelBtns.get('admission')?.classList.add('beckon');
+}
+function hideWelcome(markSeen = true) {
+  if (welcomeEl.hidden) return;
+  welcomeEl.hidden = true;
+  labelBtns.get('admission')?.classList.remove('beckon');
+  if (markSeen) progress.setWelcomeSeen();
+}
+$('welcome-close').addEventListener('click', () => {
+  hideWelcome();
+  announce(status, '已關閉提示。點地圖上的站點，或使用下方「清單」開始。');
+  labelBtns.get('admission')?.focus();
+});
+welcomeEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') { hideWelcome(); labelBtns.get('admission')?.focus(); } });
+
+const overlaps = (a: DOMRect, b: DOMRect, pad = 4) => a.x < b.right + pad && a.right > b.x - pad && a.y < b.bottom + pad && a.bottom > b.y - pad;
+/** 提示放在入口（貓咪）旁邊，避開站點標籤、地圖按鈕、狀態列；都放不下時放在畫面左下角 */
+function placeWelcome(labels: DOMRect[], W: number, H: number, tools: DOMRect) {
+  if (!welcomeVisible() || !scene) return;
+  const c = WILDLIFE_SPOTS.cat, t = tileOf(c.tile);
+  const a = scene.toScreen(t.x + c.dx, t.y + c.dz, tileHeight(t) + 26);
+  const w = welcomeEl.offsetWidth, h = welcomeEl.offsetHeight;
+  const mapBox = labelsEl.getBoundingClientRect();
+  const avoid = [...labels, tools];
+  for (const { el } of zoneSigns) { const r = el.getBoundingClientRect(); avoid.push(new DOMRect(r.x - mapBox.x, r.y - mapBox.y, r.width, r.height)); }
+  for (const id of ['status', 'phase-chip']) {
+    const el = $(id);
+    if (!el.hidden && el.textContent) { const r = el.getBoundingClientRect(); avoid.push(new DOMRect(r.x - mapBox.x, r.y - mapBox.y, r.width, r.height)); }
+  }
+  // 依序嘗試：入口下方、入口上方、畫面頂端、畫面底端；水平位置靠近入口，但不壓到右側按鈕
+  const ys = [a.y + 34, a.y + 80, a.y - h - 34, a.y - h - 80, 12, H - h - 12];
+  const xs = [a.x - w * 0.3, a.x + 24, a.x - w - 24];
+  let pick: [number, number] | null = null;
+  search: for (const y of ys) {
+    if (y < 8 || y + h > H - 8) continue;
+    const hitsTools = y < tools.bottom && y + h > tools.top;
+    const maxX = (hitsTools ? tools.left - 8 : W - 8) - w;
+    if (maxX < 8) continue;
+    for (const x0 of xs) {
+      const x = Math.min(Math.max(x0, 8), maxX);
+      const r = new DOMRect(x, y, w, h);
+      if (avoid.some((b) => overlaps(r, b))) continue;
+      pick = [x, y];
+      break search;
+    }
+  }
+  if (!pick) pick = [8, Math.max(8, Math.min(H - h - 8, ys[0]))];
+  welcomeEl.style.transform = `translate(${Math.round(pick[0])}px, ${Math.round(pick[1])}px)`;
 }
 
 // ───────── 遊戲場景 ─────────
@@ -168,6 +226,7 @@ function walkTo(id: StationId, itemId?: string) {
 
 function openStation(id: StationId, opener: HTMLElement, itemId?: string) {
   const s = byId.get(id)!;
+  hideWelcome();
   lastOpener = opener;
   if (linksOn) scene?.setLinks(CARE_LINKS, id);
   openMissionDialog({
@@ -307,6 +366,7 @@ function openMore() {
 const intro = $('intro');
 function showIntro() {
   intro.hidden = false;
+  hideWelcome(false);
   $('start-btn').textContent = progress.role ? '繼續探索' : '開始探索';
   $('start-btn').focus();
 }
@@ -314,6 +374,7 @@ $('start-btn').addEventListener('click', () => {
   const finish = () => {
     intro.hidden = true;
     announce(status, `以「${ROLE_TEXT[role]}」角色從醫院大門出發，第一站是「01 入院評估花園」。點島嶼或使用清單前往。`);
+    showWelcome();
     labelBtns.get('admission')?.focus();
   };
   if (!progress.role) pickRole($('start-btn'), () => { if (progress.role) finish(); });
@@ -432,6 +493,15 @@ window.__hfIsland = {
   get moving() { return scene?.isMoving ?? false; },
   get zoom() { return scene ? scene.zoom : null; },
   get angle() { return scene ? scene.angle : null; },
+  get wildlife() { return scene ? scene.wildlifeState : null; },
+  focusWorld(x: number, y: number) { scene?.focusWorld(x, y); },
+  /** 貓或狗在視窗中的座標 */
+  wildlifePoint(name: 'cat' | 'dog') {
+    if (!scene) return null;
+    const c = WILDLIFE_SPOTS[name], t = tileOf(c.tile), r = $('game').getBoundingClientRect();
+    const p = scene.toScreen(t.x + c.dx, t.y + c.dz, tileHeight(t) + 8);
+    return { x: r.left + p.x, y: r.top + p.y };
+  },
   /** 島（建築）中心在視窗中的座標（測試點擊島本體用） */
   buildingPoint(id: StationId) {
     if (!scene) return null;
