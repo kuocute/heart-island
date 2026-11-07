@@ -105,7 +105,43 @@ try {
     const after = await page.locator('.map-label[data-state=new]').count();
     const stored = await page.evaluate(() => localStorage.getItem('hf-care-island:v1'));
     const introShown = await page.locator('#intro').isVisible();
-    check('4c 重置後回到初始狀態', after === 14 && stored === null && introShown, `未探索站數=${after}`);
+    check('4c 重置後回到初始狀態', after === 15 && stored === null && introShown, `未探索站數=${after}`);
+    await ctx.close();
+  }
+
+  // ───── 9. 返家照護站：走到站點 → 自動打開衛教卡 → 情境練習 → 答錯重試 → 答對完成 → 地圖顯示「已完成」 ─────
+  {
+    const { ctx, page } = await newPage();
+    await startAs(page, 'patient');
+    await page.locator('.map-label[data-station=home-care]').evaluate((el) => el.click());
+    await page.waitForTimeout(250);
+    const walking = await page.evaluate(() => window.__hfIsland.moving);
+    await dialog(page).waitFor({ timeout: 60000 });
+    const which = await dialog(page).getAttribute('data-station');
+    const cardText = await dialog(page).innerText();
+    check('9a 點返家照護站，角色走過去並自動打開衛教卡', walking && which === 'home-care' && cardText.includes('回家第一週：每天量體重'), `行走中=${walking}`);
+    check('9b 衛教卡與題目標示「待照護團隊審閱」', cardText.includes('待照護團隊審閱'));
+    await clickBtn(page, '開始情境練習');
+    const quizText = await dialog(page).innerText();
+    await page.getByRole('button', { name: /自己多吃一顆利尿劑/ }).click();
+    const wrongHead = await dialog(page).locator('.step-heading').innerText();
+    const reason = await dialog(page).locator('.feedback').innerText();
+    check('9c 答錯顯示回饋與原因，可再試一次', quizText.includes('阿明伯') && quizText.includes('待照護團隊審閱') && wrongHead.includes('再想想') && reason.includes('原因'), reason.slice(0, 30));
+    await clickBtn(page, '再試一次');
+    const tried = await page.locator('.choice.tried').count();
+    await page.getByRole('button', { name: /打電話給個案管理師/ }).click();
+    const okText = await dialog(page).innerText();
+    check('9d 重試答對後顯示本站已完成', tried === 1 && okText.includes('答對了') && okText.includes('本站已完成'));
+    await clickBtn(page, '返回地圖');
+    await page.waitForTimeout(300);
+    const label = page.locator('.map-label[data-station=home-care]');
+    const st = await label.getAttribute('data-state');
+    const lt = await label.innerText();
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-station'));
+    check('9e 返回地圖後站點顯示「已完成」，焦點回到站點', st === 'practiced' && lt.includes('已完成') && focused === 'home-care', `${st} ${lt.replace(/\s+/g, ' ')}`);
+    await page.locator('.map-label[data-station=home-care]').evaluate((el) => el.click());
+    await dialog(page).waitFor({ timeout: 15000 });
+    check('9f 再次點選可複習（直接開啟衛教卡）', (await dialog(page).innerText()).includes('本站已完成，可以再練習一次'));
     await ctx.close();
   }
 
@@ -138,7 +174,7 @@ try {
     const rows = await page.locator('.station-row').count();
     await page.locator('.station-row[data-station=weight]').click();
     await dialog(page).waitFor();
-    check(`5d [${width}px] 清單列出 14 站並直接開啟任務`, rows === 14 && (await dialog(page).getAttribute('data-station')) === 'weight');
+    check(`5d [${width}px] 清單列出 15 站並直接開啟任務`, rows === 15 && (await dialog(page).getAttribute('data-station')) === 'weight');
     await clickBtn(page, '開始任務');
     await clickBtn(page, '下一步：做選擇');
     for (const label of ['寫下紀錄', '站上體重計量測', '查看數字']) await page.getByRole('button', { name: label, exact: true }).click();

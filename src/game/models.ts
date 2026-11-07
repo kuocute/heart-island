@@ -399,8 +399,9 @@ export const STATION_MODELS: Record<string, Builder> = {
     mill.position.set(0, 44, -14);
     return G(hill, mill, tree('pine', { x: -58, z: 20 }, 0.85), tree('pine', { x: 60, z: 16 }, 0.9), tree('round', { x: -30, z: 46 }, 0.7), bush({ x: 34, z: 50 }));
   },
-  'decor-gate': () => {
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(56, 14), new THREE.MeshStandardMaterial({ map: textTexture('回家的路'), roughness: 0.9 }));
+  // 返家照護站：心尖的回家之門，拱門下是通往居家區的步道
+  'home-care': () => {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(56, 14), new THREE.MeshStandardMaterial({ map: textTexture('返家照護站'), roughness: 0.9 }));
     sign.position.set(0, 44, 0.8);
     return G(
       box(8, 40, 8, '#c98f5a', { x: -32 }), box(8, 40, 8, '#c98f5a', { x: 32 }), box(76, 7, 10, '#a86d42', { y: 37 }), sign,

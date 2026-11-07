@@ -45,10 +45,10 @@ button, input { font: inherit; color: inherit; }
 .labels { position: absolute; inset: 0; pointer-events: none; }
 .map-label { position: absolute; left: 0; top: 0; pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 12px 4px 5px; border-radius: 999px; border: 2px solid #fff; background: rgba(255, 253, 248, 0.95); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); font-size: 0.92rem; font-weight: 700; white-space: nowrap; cursor: pointer; will-change: transform; }
 .map-label-no { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 0.8rem; }
-.map-label[data-state='explored'] .map-label-no { background: #c27a1a; }
+.map-label[data-state='explored'] .map-label-no { background: var(--explored); }
 .map-label[data-state='practiced'] .map-label-no { background: var(--ok); }
 .map-label-state { color: var(--ok); font-size: 1rem; min-width: 0; }
-.map-label[data-state='explored'] .map-label-state { color: #c27a1a; }
+.map-label[data-state='explored'] .map-label-state { color: var(--explored); }
 .map-label:hover { background: #fff; }
 .labels.compact .map-label { font-size: 0.78rem; gap: 3px; padding: 2px 8px 2px 2px; border-width: 1px; background-clip: padding-box; }
 .labels.compact .map-label-no { width: 24px; height: 24px; font-size: 0.7rem; }
@@ -187,7 +187,7 @@ button, input { font: inherit; color: inherit; }
 .station-row-title { font-weight: 800; }
 .station-row-sub { font-size: 0.85rem; color: var(--muted); }
 .dot { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--teal); color: #fff; font-weight: 800; font-size: 0.85rem; }
-.dot.explored { background: #c27a1a; }
+.dot.explored { background: var(--explored); }
 .dot.practiced { background: var(--ok); }
 .walk-btn { min-width: 52px; }
 
@@ -221,8 +221,11 @@ button, input { font: inherit; color: inherit; }
 
 /* ───── v2：六角島、區域、搜尋、時間軸、串聯 ───── */
 :root { --hospital: #3c8f88; --hospital-bg: #e3f3ee; --home: #c27a1a; --home-bg: #fbf0dc; }
-.map-label.hospital .map-label-no { background: var(--hospital); }
-.map-label.home .map-label-no { background: #8a6a2f; }
+/* 對比：hospital／home 只用在色塊與裝飾；小字與站號圓點改用 *-ink（白字或在 paper 上皆 ≥ 4.5:1）。
+   explored 也改深，白色站號 ≥ 4.5:1。 */
+:root { --hospital-ink: #2f716b; --home-ink: #8c5a16; --home-dot: #8a6a2f; --explored: #a3530e; }
+.map-label.hospital .map-label-no { background: var(--hospital-ink); }
+.map-label.home .map-label-no { background: var(--home-dot); }
 .map-label .short { display: none; }
 .labels.compact .map-label .full { display: none; }
 .labels.compact .map-label .short { display: inline; }
@@ -232,8 +235,8 @@ body[data-role='staff'] .map-label-staff { background: #2f5f9a; color: #fff; }
 .zone-sign { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; padding: 4px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.88); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); line-height: 1.3; white-space: nowrap; }
 .zone-sign strong { font-size: 1rem; }
 .zone-sign span { font-size: 0.72rem; color: var(--muted); }
-.zone-sign.hospital strong { color: var(--hospital); }
-.zone-sign.home strong { color: var(--home); }
+.zone-sign.hospital strong { color: var(--hospital-ink); }
+.zone-sign.home strong { color: var(--home-ink); }
 .labels.compact ~ .zone-signs .zone-sign span { display: none; }
 .phase-chip { position: absolute; left: 10px; top: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 2px 2px 2px 12px; border-radius: 999px; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); font-weight: 700; font-size: 0.9rem; }
 .phase-chip[hidden] { display: none; }
@@ -268,11 +271,11 @@ body[data-role='staff'] .map-label-staff { background: #2f5f9a; color: #fff; }
 .search-input { width: 100%; min-height: 48px; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--line); background: #fff; font-size: 1rem; }
 .search-input:focus { border-color: var(--teal); outline: none; box-shadow: 0 0 0 3px rgba(47, 127, 120, 0.25); }
 .zone-group h3 { margin: 14px 0 4px; font-size: 1rem; }
-.zone-group.hospital h3 { color: var(--hospital); }
-.zone-group.home h3 { color: var(--home); }
-.dot.hospital { background: var(--hospital); }
-.dot.home { background: #8a6a2f; }
-.dot.explored { background: #c27a1a; }
+.zone-group.hospital h3 { color: var(--hospital-ink); }
+.zone-group.home h3 { color: var(--home-ink); }
+.dot.hospital { background: var(--hospital-ink); }
+.dot.home { background: var(--home-dot); }
+.dot.explored { background: var(--explored); }
 .dot.practiced { background: var(--ok); }
 
 .timeline { list-style: none; padding: 0; margin: 8px 0; position: relative; }
@@ -307,3 +310,18 @@ body[data-role='staff'] .map-label-staff { background: #2f5f9a; color: #fff; }
 body[data-tod='night'] .zone-sign { background: rgba(30, 44, 74, 0.88); color: #fff; }
 body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
 @media (max-height: 700px) { .zoom { gap: 4px; } .zoom .icon-btn { width: 44px; height: 44px; } }
+
+/* ───── 返家照護站：衛教卡、審閱標示、已完成 ───── */
+.map-label.hospital[data-state='explored'] .map-label-no, .map-label.home[data-state='explored'] .map-label-no { background: var(--explored); }
+.map-label.hospital[data-state='practiced'] .map-label-no, .map-label.home[data-state='practiced'] .map-label-no { background: var(--ok); }
+.map-label[data-station='home-care'] { border-color: var(--coral); }
+.map-label[data-station='home-care'][data-state='practiced'] { border-color: var(--ok); }
+.map-label[data-station='home-care'][data-state='practiced'] .map-label-state { font-size: 0.82rem; font-weight: 800; background: var(--ok-bg); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+/* 縮到最小時其他站只剩站號，返家照護站仍顯示「已完成」 */
+.labels.tiny .map-label[data-station='home-care'][data-state='practiced'] { padding-right: 4px; gap: 4px; }
+.pill.review { background: #fde2d6; color: #8a3a1a; font-weight: 700; }
+.care-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; margin: 8px 0; }
+.care-card .step-heading { margin-top: 0; }
+.care-card-summary { margin: 0 0 8px; }
+.care-card-points { margin: 0 0 10px; padding-left: 1.3em; }
+.care-card-points li { margin-bottom: 4px; }

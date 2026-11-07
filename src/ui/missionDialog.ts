@@ -1,4 +1,5 @@
 // 任務視窗：本站照護重點 → 看情境 → 做選擇 → 看回饋 → 說一次或做一次。
+// 有衛教卡的站（返家照護站）：讀衛教卡 → 情境練習 → 看回饋與原因（答錯可重試）→ 答對即完成。
 // 一次只呈現目前一步；知識題正誤同時用文字表示；照護偏好題不計分、不儲存選項。
 import { CARE_LINKS } from '../content/links';
 import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId } from '../content/types';
@@ -9,6 +10,7 @@ import { renderStaffCard } from './staffCard';
 type Tab = 'practice' | 'staff';
 type Step =
   | { kind: 'intro'; tab: Tab }
+  | { kind: 'card' }
   | { kind: 'item'; itemId: string }
   | { kind: 'scenario'; i: number }
   | { kind: 'choose'; i: number; tried: string[]; order: string[] }
@@ -17,6 +19,8 @@ type Step =
   | { kind: 'done' };
 
 const STEP_NAMES = ['看情境', '做選擇', '看回饋', '說一次或做一次'];
+const CARD_STEP_NAMES = ['讀衛教卡', '情境練習', '看回饋', '完成'];
+export const REVIEW_TEXT = '虛構內容・待照護團隊審閱';
 export const ROLE_TEXT: Record<Role, string> = { patient: '病友', caregiver: '家屬', staff: '醫護人員' };
 
 export type MissionDialogOptions = {
@@ -51,16 +55,20 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
 
   // 醫護人員進入住院區時，預設打開規範卡
   const defaultTab: Tab = role === 'staff' && station.staff && station.zone === 'hospital' ? 'staff' : 'practice';
-  let step: Step = o.itemId ? { kind: 'item', itemId: o.itemId } : { kind: 'intro', tab: defaultTab };
+  const card = station.card;
+  let step: Step = o.itemId ? { kind: 'item', itemId: o.itemId } : card ? { kind: 'card' } : { kind: 'intro', tab: defaultTab };
   const go = (s: Step) => { step = s; render(); };
   const missionIndex = (id?: string) => station.missions.findIndex((m) => m.id === id);
   const practiced = (m: Mission) => progress.station(station.id).practiced.includes(m.id);
+  /** 開始練習：有衛教卡的站先看卡片 */
+  const startMission = (i: number) => go(card ? { kind: 'card' } : { kind: 'scenario', i });
+  const reviewTag = () => station.review === 'pending' ? h('p', { class: 'pill review' }, REVIEW_TEXT) : '';
 
   function stepper(active: number, m: Mission, i: number) {
     return h('div', { class: 'stepper' },
       h('p', { class: 'stepper-title' }, station.missions.length > 1 ? `任務 ${i + 1}／${station.missions.length}：${m.title}` : m.title),
       h('ol', { class: 'steps', 'aria-label': '任務步驟' },
-        ...STEP_NAMES.map((n, k) => h('li', { class: k === active ? 'on' : k < active ? 'past' : '', 'aria-current': k === active ? 'step' : undefined }, n))),
+        ...(card ? CARD_STEP_NAMES : STEP_NAMES).map((n, k) => h('li', { class: k === active ? 'on' : k < active ? 'past' : '', 'aria-current': k === active ? 'step' : undefined }, n))),
     );
   }
   const heading = (text: string, cls = '') => h('h3', { class: `step-heading ${cls}`, tabindex: '-1' }, text);
@@ -71,6 +79,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
     view.dataset.step = step.kind;
     switch (step.kind) {
       case 'intro': renderIntro(step); break;
+      case 'card': renderCard(); break;
       case 'item': renderItem(step.itemId); break;
       case 'scenario': renderScenario(step.i); break;
       case 'choose': renderChoose(step); break;
@@ -147,10 +156,10 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
     if (station.pickMission) panel.append(h('p', { class: 'pick-prompt' }, station.pickMission.prompt));
     panel.append(h('h4', {}, station.pickMission ? '展館' : '練習任務'),
       h('ul', { class: 'mission-list' }, ...station.missions.map((m, i) =>
-        h('li', {}, h('button', { type: 'button', class: 'mission-pick', onclick: () => go({ kind: 'scenario', i }) },
+        h('li', {}, h('button', { type: 'button', class: 'mission-pick', onclick: () => startMission(i) },
           h('span', { class: 'mission-pick-title' }, station.pickMission ? `進入：${m.title}` : `${i + 1}. ${m.title}`),
           h('span', { class: 'mission-pick-meta' }, kindLabel(m), practiced(m) ? ' · 已練習' : ''))))));
-    if (!station.pickMission) panel.append(h('button', { type: 'button', class: 'btn btn-primary btn-block', onclick: () => go({ kind: 'scenario', i: 0 }) }, '開始任務'));
+    if (!station.pickMission) panel.append(h('button', { type: 'button', class: 'btn btn-primary btn-block', onclick: () => startMission(0) }, card ? '打開衛教卡' : '開始任務'));
     panel.append(linkList());
     view.append(panel);
   }
@@ -166,7 +175,27 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       h('p', { class: 'item-summary' }, it.summary),
       linkList(it.id),
       h('div', { class: 'actions' }, back('看本站全部重點'),
-        mi >= 0 ? h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go({ kind: 'scenario', i: mi }) }, '練習這一題') : ''),
+        mi >= 0 ? h('button', { type: 'button', class: 'btn btn-primary', onclick: () => startMission(mi) }, '練習這一題') : ''),
+    );
+  }
+
+  // ───────── 衛教卡（抵達後直接打開） ─────────
+  function renderCard() {
+    if (!card) return;
+    const m = station.missions[0];
+    view.append(
+      h('p', { class: `zone-chip ${station.zone}` }, station.zone === 'hospital' ? '住院區' : '居家區', `・${station.subtitle}`),
+      reviewTag(),
+      stepper(0, m, 0),
+      h('section', { class: 'care-card', 'aria-labelledby': 'care-card-title' },
+        h('h3', { class: 'step-heading', id: 'care-card-title', tabindex: '-1' }, card.title),
+        h('p', { class: 'care-card-summary' }, card.summary),
+        h('ul', { class: 'care-card-points' }, ...card.points.map((p) => h('li', {}, p))),
+        card.note ? h('p', { class: 'notice' }, card.note) : ''),
+      practiced(m) ? h('p', { class: 'pill ok' }, '本站已完成，可以再練習一次') : '',
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => go({ kind: 'intro', tab: 'practice' }) }, '看本站重點'),
+        h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go({ kind: 'choose', i: 0, tried: [], order: [] }) }, '開始情境練習')),
     );
   }
 
@@ -182,7 +211,8 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   // ───────── 做選擇 ─────────
   function renderChoose(s: Extract<Step, { kind: 'choose' }>) {
     const m = station.missions[s.i];
-    view.append(stepper(1, m, s.i), heading(m.question));
+    if (card) view.append(reviewTag(), stepper(1, m, s.i), h('h3', { class: 'step-heading', tabindex: '-1' }, '情境'), h('p', { class: 'scenario' }, m.scenario), h('p', { class: 'pick-prompt' }, m.question));
+    else view.append(stepper(1, m, s.i), heading(m.question));
     if (m.prop && m.prop.kind === 'sheet') view.append(renderProp(m.prop, true));
     if (m.interaction === 'reflection') view.append(h('p', { class: 'pill' }, '照護偏好題・沒有對錯・不計分'));
 
@@ -248,8 +278,24 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       m.interaction === 'sequence' && s.order
         ? h('p', {}, '你排的順序：', s.order.map((id) => m.choices.find((c) => c.id === id)!.label).join(' → '))
         : h('p', {}, '你選擇的是：', h('strong', {}, m.choices.find((x) => x.id === s.choiceId)!.label)),
-      h('p', { class: `feedback ${ok ? 'ok' : 'retry'}` }, h('strong', {}, ok ? '正確。' : '提示：'), fb),
+      h('p', { class: `feedback ${ok ? 'ok' : 'retry'}` }, h('strong', {}, ok ? '正確。' : card ? '原因：' : '提示：'), fb),
     );
+    if (card) {
+      if (ok) {
+        progress.setPracticed(station.id, m.id, true);
+        view.append(
+          h('p', { class: 'pill ok' }, '✓ 本站已完成'),
+          h('p', { class: 'small muted' }, '答對後自動標記為「已完成」，只記錄在這台裝置上，不代表醫療人員已確認示教能力。'),
+          h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => modal.close() }, '返回地圖')));
+        announce(live, '答對了，本站已完成。');
+      } else {
+        view.append(h('div', { class: 'actions' },
+          h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => go({ kind: 'card' }) }, '再看一次衛教卡'),
+          h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go({ kind: 'choose', i: s.i, tried: s.tried, order: [] }) }, '再試一次')));
+        announce(live, '答錯了，請看原因後再試一次。');
+      }
+      return;
+    }
     view.append(h('div', { class: 'actions' }, ok ? next : h('button', {
       type: 'button', class: 'btn btn-primary', onclick: () => go({ kind: 'choose', i: s.i, tried: s.tried, order: [] }),
     }, '再試一次')));

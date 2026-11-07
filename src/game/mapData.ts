@@ -1,5 +1,5 @@
 // 3D 島圖座標資料：21 座六角島緊密相連，拼成一顆心。
-// 左半邊是住院區（入院到出院），心尖是「回家之門」，右半邊是居家區。
+// 左半邊是住院區（入院到出院），心尖是「返家照護站」（回家之門），右半邊是居家區。
 // 修改站點位置：改下方 CELLS 的 [欄, 列] 即可；步道會依相鄰關係自動產生。
 // 座標：x 向東（右），y 為南北（數字越大越靠近畫面下方，3D 中即 z 軸）；單位為世界像素。
 import type { StationId, Zone } from '../content/types';
@@ -38,10 +38,10 @@ const CELLS: [Tile['id'], number, number, Look][] = [
   ['decor-garden', 1, 1, 'hospital'],
   ['decor-ambulance', 2, 1, 'hospital'],
   ['decor-park', 2, 2, 'hospital'],
-  // 中線：心心廣場、小山丘、心尖的回家之門
+  // 中線：心心廣場、小山丘、心尖的「返家照護站」（回家之門）
   ['decor-heart', 3, 1, 'plaza'],
   ['decor-hill', 3, 2, 'plaza'],
-  ['decor-gate', 3, 3, 'plaza'],
+  ['home-care', 3, 3, 'plaza'],
   // 右半心：居家區（從心尖往上：06 → 07 → 08 → 09 → 10 → 11，再到內圈 12 → 13 → 14）
   ['weight', 4, 3, 'home'],
   ['medication', 5, 2, 'home'],

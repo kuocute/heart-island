@@ -70,7 +70,7 @@ function refreshLabels() {
     const btn = labelBtns.get(s.id)!;
     const st = statusOf(s, progress);
     btn.dataset.state = st.st;
-    btn.querySelector('.map-label-state')!.textContent = st.st === 'practiced' ? '✓' : st.st === 'explored' ? '•' : '';
+    btn.querySelector('.map-label-state')!.textContent = st.st === 'practiced' ? (s.card ? '✓ 已完成' : '✓') : st.st === 'explored' ? '•' : '';
     btn.setAttribute('aria-label', `${s.no} ${s.title}（${s.zone === 'hospital' ? '住院區' : '居家區'}・${s.subtitle}），${st.text}${s.staff ? '，含醫護規範' : ''}。走過去並開啟`);
   }
   const chip = $('role-chip');
@@ -298,7 +298,7 @@ function openMore() {
       h('li', {}, '情境中的出院單、照護卡與數字皆為虛構。'),
       h('li', {}, '警訊門檻、聯絡方式與緊急分流以院方核定的個別出院計畫為準；緊急狀況請撥打 119。'),
       h('li', {}, '醫護規範卡提供認證查詢文字；筆記本連結只在院內受保護環境、登入後顯示。'),
-      h('li', {}, '島上那顆紅色小心心會依 01→14 的順序巡島，跟著它走就是完整的照護旅程。')),
+      h('li', {}, '島上那顆紅色小心心會從 01 出發、經過心尖的返家照護站，一路巡到 14，跟著它走就是完整的照護旅程。')),
     progress.saveOk ? '' : h('p', { class: 'notice' }, '這台裝置目前無法儲存進度，仍可繼續遊玩。'),
   );
 }

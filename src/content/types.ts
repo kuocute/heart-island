@@ -12,6 +12,8 @@ export type StationId =
   | 'team'
   | 'discharge-prep'
   | 'discharge'
+  // 心尖：從醫院回到家的轉換點
+  | 'home-care'
   // 居家區
   | 'weight'
   | 'medication'
@@ -105,6 +107,17 @@ export type StaffCard = {
   query: string;
 };
 
+/** 抵達後直接打開的衛教卡（返家照護站使用）。讀完進入情境練習，答對即完成本站。 */
+export type CareCard = {
+  title: string;
+  /** 一兩句導言 */
+  summary: string;
+  /** 3–5 個重點 */
+  points: string[];
+  /** 卡片下方的提醒（例如「依個別出院計畫」） */
+  note?: string;
+};
+
 export type Station = {
   id: StationId;
   /** 站號，例如 '01' */
@@ -132,6 +145,13 @@ export type Station = {
   missions: Mission[];
   /** 醫護人員規範卡。住院區每站都有；居家區視需要（例如回診與電話追蹤）。 */
   staff?: StaffCard;
+  /**
+   * 衛教卡流程：抵達後先看衛教卡 → 情境練習 → 看回饋（答錯可重試）→ 答對即完成，回到地圖顯示「已完成」。
+   * 有 card 時，本站只能有一個知識題（interaction: 'quiz'）。
+   */
+  card?: CareCard;
+  /** 'pending'：衛教文案尚未經照護團隊審閱，畫面會標示「待照護團隊審閱」 */
+  review?: 'pending';
 };
 
 /** 照護串聯線：把不同站的照護重點連起來 */
