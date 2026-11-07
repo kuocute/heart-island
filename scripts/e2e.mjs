@@ -316,6 +316,82 @@ try {
     await ctx.close();
   }
 
+  // ───── 10. 溫馨小島：進島引導、貓狗、海浪與海洋生物、減少動態效果、桌機版返家照護站流程 ─────
+  for (const [w, hgt] of [[390, 844], [1280, 800]]) {
+    const { ctx, page } = await newPage({ viewport: { width: w, height: hgt }, hasTouch: w < 500 });
+    await startAs(page, 'caregiver');
+    await page.waitForTimeout(1500);
+    const wel = page.locator('#welcome');
+    const welText = await wel.innerText();
+    const overlap = await page.evaluate(() => {
+      const r = document.getElementById('welcome').getBoundingClientRect();
+      const hit = (b) => r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top;
+      const labels = [...document.querySelectorAll('.map-label:not(.offscreen)')].filter((el) => el.offsetParent).map((el) => el.getBoundingClientRect());
+      const buttons = [...document.querySelectorAll('.zoom .icon-btn, .toolbar .tool, .topbar button')].map((el) => el.getBoundingClientRect());
+      const map = document.getElementById('map').getBoundingClientRect();
+      return { labels: labels.filter(hit).length, buttons: buttons.filter(hit).length, inside: r.left >= map.left && r.right <= map.right && r.top >= map.top && r.bottom <= map.bottom };
+    });
+    check(`10a [${w}px] 第一次進島顯示引導，不遮住站點標籤與按鈕`, (await wel.isVisible()) && welText.includes('歡迎來到心衰照護島，點一個站點，開始你的照護旅程。') && overlap.labels === 0 && overlap.buttons === 0 && overlap.inside, JSON.stringify(overlap));
+    const wl0 = await page.evaluate(() => window.__hfIsland.wildlife);
+    check(`10b [${w}px] 入口的貓：玩家在旁邊時抬頭看；小狗在返家照護站外趴著休息`, wl0.catLooking === true && wl0.dogStanding === false, JSON.stringify(wl0));
+    await page.waitForTimeout(2500);
+    const wl1 = await page.evaluate(() => window.__hfIsland.wildlife);
+    check(`10c [${w}px] 近岸浪花與魚群持續動畫（${wl0.coastEdges} 段海岸線、${wl0.fish} 條魚）`, wl1.time > wl0.time && wl0.coastEdges >= 20 && wl0.fish === 8, `${wl0.time} → ${wl1.time}`);
+    if (w > 500) {
+      await page.waitForFunction(() => window.__hfIsland.wildlife.turtleUp > 0.9, null, { timeout: 90000 }).then(() => check('10d 海龜會浮出水面', true), () => check('10d 海龜會浮出水面', false, '90 秒內沒有浮出'));
+    }
+    await page.click('#welcome-close');
+    check(`10e [${w}px] 引導可以關閉，焦點回到 01 站`, !(await wel.isVisible()) && (await page.evaluate(() => document.activeElement?.getAttribute('data-station'))) === 'admission');
+    await page.reload();
+    await page.waitForSelector('body[data-ready=true]');
+    await page.click('#start-btn');
+    await page.waitForTimeout(500);
+    check(`10f [${w}px] 關閉後重新整理不再出現`, !(await wel.isVisible()));
+    // 走到返家照護站：小狗站起來；完成衛教卡 → 作答回饋 → 返回地圖
+    await page.locator('.map-label[data-station=home-care]').evaluate((el) => el.click());
+    await dialog(page).waitFor({ timeout: 90000 });
+    const dogUp = await page.evaluate(() => window.__hfIsland.wildlife.dogStanding);
+    const catAway = await page.evaluate(() => window.__hfIsland.wildlife.catLooking);
+    check(`10g [${w}px] 玩家走到返家照護站時小狗站起來，貓恢復待機`, dogUp === true && catAway === false);
+    if (w > 500) {
+      const cardText = await dialog(page).innerText();
+      await clickBtn(page, '開始情境練習');
+      await page.getByRole('button', { name: /先不管，明天再量/ }).click();
+      const wrong = await dialog(page).locator('.feedback').innerText();
+      await clickBtn(page, '再試一次');
+      await page.getByRole('button', { name: /打電話給個案管理師/ }).click();
+      const okText = await dialog(page).innerText();
+      await clickBtn(page, '返回地圖');
+      await page.waitForTimeout(300);
+      const closed = (await dialog(page).count()) === 0;
+      const st = await page.locator('.map-label[data-station=home-care]').getAttribute('data-state');
+      check('10h [1280px] 桌機：返家照護站 → 衛教卡 → 作答回饋（答錯有原因、答對完成）→ 返回地圖', cardText.includes('回家第一週') && wrong.includes('原因') && okText.includes('本站已完成') && closed && st === 'practiced');
+      // 動物不擋站點點擊：點小狗所在位置，會開啟牠腳下的返家照護站
+      for (let i = 0; i < 3; i++) await page.click('#zoom-in');
+      await page.waitForTimeout(3000);
+      const dp = await page.evaluate(() => window.__hfIsland.wildlifePoint('dog'));
+      await page.mouse.click(dp.x, dp.y);
+      await dialog(page).waitFor({ timeout: 30000 }).catch(() => {});
+      check('10i 點到小狗的位置仍會開啟返家照護站（動物不擋點擊）', (await dialog(page).getAttribute('data-station').catch(() => null)) === 'home-care');
+    }
+    await ctx.close();
+  }
+  {
+    // 減少動態效果：環境動畫停止，動物直接切換姿勢，站點仍可用鍵盤完成
+    const { ctx, page } = await newPage({ reducedMotion: 'reduce', viewport: { width: 1024, height: 768 }, hasTouch: false });
+    await startAs(page, 'patient');
+    const a = await page.evaluate(() => window.__hfIsland.wildlife);
+    await page.waitForTimeout(2500);
+    const b = await page.evaluate(() => window.__hfIsland.wildlife);
+    check('10j 減少動態效果：浪花、魚群、海龜停止', a.time === b.time, `${a.time} → ${b.time}`);
+    await page.locator('.map-label[data-station=home-care]').focus();
+    await page.keyboard.press('Enter');
+    await dialog(page).waitFor({ timeout: 15000 });
+    const dog = await page.evaluate(() => window.__hfIsland.wildlife.dogStanding);
+    check('10k 減少動態效果：直接抵達返家照護站，小狗直接站起來，站點正常開啟', dog === true && (await dialog(page).getAttribute('data-station')) === 'home-care');
+    await ctx.close();
+  }
+
   // ───── 7. 未登入者無法取得院內工作卡連結或內部資料 ─────
   {
     execSync('npx vite build --outDir dist-staff-test --emptyOutDir', { env: { ...process.env, VITE_STAFF_API_BASE: '/staff/api' }, stdio: 'ignore' });

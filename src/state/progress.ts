@@ -1,4 +1,4 @@
-// 裝置端探索狀態。只儲存：站點 ID、角色、已探索／已練習的任務 ID、上次停留站點。
+// 裝置端探索狀態。只儲存：站點 ID、角色、已探索／已練習的任務 ID、上次停留站點、是否看過進島提示。
 // 不儲存病歷、真實體重、姓名，也不儲存照護偏好題選了什麼。
 // localStorage 無法使用時（隱私模式、權限）仍可遊玩，只是重新整理後不會保留。
 import type { Role, StationId } from '../content/types';
@@ -11,9 +11,11 @@ export type Progress = {
   role: Role | null;
   lastStation: StationId | null;
   stations: Partial<Record<StationId, StationProgress>>;
+  /** 是否已看過（或關閉）第一次進島的引導提示 */
+  welcomeSeen: boolean;
 };
 
-export const emptyProgress = (): Progress => ({ version: 1, role: null, lastStation: null, stations: {} });
+export const emptyProgress = (): Progress => ({ version: 1, role: null, lastStation: null, stations: {}, welcomeSeen: false });
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -44,6 +46,7 @@ export class ProgressStore {
       const p = JSON.parse(raw) as Partial<Progress>;
       const out = emptyProgress();
       if (isRole(p.role)) out.role = p.role;
+      out.welcomeSeen = p.welcomeSeen === true;
       if (p.lastStation && this.validIds.includes(p.lastStation)) out.lastStation = p.lastStation;
       for (const id of this.validIds) {
         const s = p.stations?.[id];
@@ -105,6 +108,14 @@ export class ProgressStore {
     if (practiced) set.add(missionId);
     else set.delete(missionId);
     this.data.stations[id] = { explored: true, practiced: [...set] };
+    this.save();
+  }
+
+  get welcomeSeen() { return this.data.welcomeSeen; }
+
+  setWelcomeSeen() {
+    if (this.data.welcomeSeen) return;
+    this.data.welcomeSeen = true;
     this.save();
   }
 

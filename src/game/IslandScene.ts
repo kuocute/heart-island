@@ -8,6 +8,7 @@ import { Avatar, SheetSprite, loadSvgTexture } from './avatar';
 import { BOAT_ROUTE, EDGES, HEX, ISLAND_BOUNDS, ITEM_SLOTS, NODES, NODE_H, SEA_LEVEL, START_NODE, TILES, labelAnchor, tileHeight, tileOf, type Look, type Tile } from './mapData';
 import { STATION_MODELS, badge, boat, hut, mat, walker } from './models';
 import { Navigator, facingOf, shortestPath, type NavEvent } from './navigation';
+import { Wildlife } from './wildlife';
 
 export type SceneHooks = {
   onNavEvent: (e: NavEvent) => void;
@@ -123,6 +124,9 @@ export class IslandScene {
   private following = false;
   private ocean!: THREE.Mesh;
   private oceanBase!: Float32Array;
+  /** 每個海面頂點的起伏強度：近岸平緩、遠海較大 */
+  private oceanAmp!: Float32Array;
+  private wildlife!: Wildlife;
   private tileGroups = new Map<string, THREE.Group>();
   private linkGroup = new THREE.Group();
   private boatObj?: THREE.Group;
@@ -201,6 +205,8 @@ export class IslandScene {
 
     this.boatObj = boat();
     s.add(this.boatObj);
+    this.wildlife = new Wildlife();
+    s.add(this.wildlife.group);
     this.buildMascot(mascotTex);
     this.buildWalkers();
     if (new URLSearchParams(location.search).has('debug')) this.buildDebug();
@@ -217,6 +223,12 @@ export class IslandScene {
     const g = new THREE.PlaneGeometry(5200, 5200, 70, 70);
     g.rotateX(-Math.PI / 2);
     this.oceanBase = Float32Array.from(g.attributes.position.array as Float32Array);
+    this.oceanAmp = new Float32Array(this.oceanBase.length / 3);
+    for (let i = 0; i < this.oceanAmp.length; i++) {
+      const x = this.oceanBase[i * 3] + 504, z = this.oceanBase[i * 3 + 2] + 380;
+      const d = Math.min(...TILES.map((t) => Math.hypot(t.x - x, t.y - z)));
+      this.oceanAmp[i] = THREE.MathUtils.clamp((d - 110) / 520, 0.12, 1);
+    }
     this.ocean = new THREE.Mesh(g, mat(SKY.day.ocean, { roughness: 0.5, metalness: 0.02 }));
     this.ocean.position.set(504, SEA_LEVEL, 380);
     this.ocean.receiveShadow = true;
@@ -386,6 +398,7 @@ export class IslandScene {
       if (k >= 1) this.anim = null;
     }
     if (!this.reducedMotion) this.animateDecor(t, dt);
+    this.wildlife.update(dt, this.avatar.group.position, this.reducedMotion);
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
     this.opts.hooks.onCameraChange();
@@ -397,7 +410,8 @@ export class IslandScene {
     const arr = pos.array as Float32Array;
     for (let i = 0; i < arr.length; i += 3) {
       const x = this.oceanBase[i], z = this.oceanBase[i + 2];
-      arr[i + 1] = Math.sin(x * 0.012 + t * 1.1) * 2.2 + Math.cos(z * 0.015 + t * 0.8) * 1.8;
+      // 遠海：兩組慢速長浪疊加；近岸：起伏很小，讓浪花看得清楚
+      arr[i + 1] = (Math.sin(x * 0.009 + t * 0.7) * 2.4 + Math.cos(z * 0.012 + t * 0.55) * 1.8 + Math.sin((x + z) * 0.02 + t * 1.3) * 0.6) * this.oceanAmp[i / 3];
     }
     pos.needsUpdate = true;
     this.ocean.geometry.computeVertexNormals();
@@ -511,7 +525,11 @@ export class IslandScene {
     for (const m of this.glowMats) m.emissiveIntensity = k.glow;
     if (this.heart) (this.heart.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.15 + k.glow * 0.6;
     if (this.lamp) (this.lamp.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.8 + k.glow;
+    this.wildlife?.setTimeOfDay(tod);
   }
+
+  /** 動物與海洋生物的狀態（測試用） */
+  get wildlifeState() { return this.wildlife?.state() ?? null; }
 
   goToStation(id: StationId, nodeId: string) {
     if (this.reducedMotion) {
@@ -642,6 +660,9 @@ export class IslandScene {
     const t = tileOf(id);
     this.focusPoint(t.x, t.y);
   }
+
+  /** 把鏡頭移到地圖上的某一點（測試與除錯用） */
+  focusWorld(x: number, z: number) { this.focusPoint(x, z); }
 
   private focusPoint(x: number, z: number) {
     this.stopFollow();

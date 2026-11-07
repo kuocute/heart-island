@@ -325,3 +325,12 @@ body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
 .care-card-summary { margin: 0 0 8px; }
 .care-card-points { margin: 0 0 10px; padding-left: 1.3em; }
 .care-card-points li { margin-bottom: 4px; }
+
+/* ───── 第一次進島的引導提示 ───── */
+.welcome { position: absolute; left: 0; top: 0; z-index: 4; display: flex; align-items: center; gap: 8px; max-width: min(320px, calc(100% - 84px)); padding: 6px 6px 6px 14px; border-radius: 18px; background: #fffaf2; border: 2px solid #f0b79a; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); will-change: transform; }
+.welcome[hidden] { display: none; }
+.welcome-text { margin: 0; font-size: 0.95rem; font-weight: 700; line-height: 1.45; color: #6b3a1f; }
+.welcome-paw { font-size: 1.1rem; }
+.welcome-close { flex: none; border: 0; background: transparent; }
+.map-label.beckon .map-label-no { box-shadow: 0 0 0 0 rgba(226, 112, 74, 0.7); animation: beckon 1.6s ease-out infinite; }
+@keyframes beckon { 0% { box-shadow: 0 0 0 0 rgba(226, 112, 74, 0.7); } 100% { box-shadow: 0 0 0 12px rgba(226, 112, 74, 0); } }

@@ -127,8 +127,17 @@ describe('探索狀態', () => {
     a.setRole('patient');
     a.setPracticed('weight', 'weight-card', true);
     const saved = JSON.parse(st.m.get(STORAGE_KEY)!);
-    expect(Object.keys(saved).sort()).toEqual(['lastStation', 'role', 'stations', 'version']);
+    expect(Object.keys(saved).sort()).toEqual(['lastStation', 'role', 'stations', 'version', 'welcomeSeen']);
     expect(Object.keys(saved.stations.weight).sort()).toEqual(['explored', 'practiced']);
+  });
+  it('進島提示看過一次就不再出現，重置後恢復', () => {
+    const st = mem();
+    const a = new ProgressStore(STATION_IDS, st);
+    expect(a.welcomeSeen).toBe(false);
+    a.setWelcomeSeen();
+    expect(new ProgressStore(STATION_IDS, st).welcomeSeen).toBe(true);
+    a.reset();
+    expect(new ProgressStore(STATION_IDS, st).welcomeSeen).toBe(false);
   });
   it('儲存失敗仍可遊玩', () => {
     const broken = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('quota'); }, removeItem: () => {} };
