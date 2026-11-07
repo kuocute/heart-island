@@ -35,6 +35,8 @@ async function startAs(page, roleName) {
   await page.click('#start-btn');
   await page.locator(`.role-card[data-role=${roleName}]`).click();
   await page.waitForSelector('#intro[hidden]', { state: 'attached' });
+  // 開場鏡頭（入口 → 全景）結束後再開始操作
+  await page.waitForFunction(() => window.__hfIsland.cameraSettled, null, { timeout: 30000 });
 }
 
 try {
@@ -319,8 +321,16 @@ try {
   // ───── 10. 溫馨小島：進島引導、貓狗、海浪與海洋生物、減少動態效果、桌機版返家照護站流程 ─────
   for (const [w, hgt] of [[390, 844], [1280, 800]]) {
     const { ctx, page } = await newPage({ viewport: { width: w, height: hgt }, hasTouch: w < 500 });
-    await startAs(page, 'caregiver');
-    await page.waitForTimeout(1500);
+    // 在頁面內每 50 毫秒記錄最大縮放，避免測試機忙碌時錯過開場的拉近畫面
+    await page.evaluate(() => { window.__maxZoom = 0; setInterval(() => { window.__maxZoom = Math.max(window.__maxZoom, window.__hfIsland.zoom ?? 0); }, 50); });
+    await page.click('#start-btn');
+    await page.locator('.role-card[data-role=caregiver]').click();
+    await page.waitForSelector('#intro[hidden]', { state: 'attached' });
+    await page.waitForFunction(() => window.__hfIsland.cameraSettled, null, { timeout: 30000 });
+    const zStart = await page.evaluate(() => window.__maxZoom);
+    const zEnd = await page.evaluate(() => window.__hfIsland.zoom);
+    check(`10z [${w}px] 進島開場：鏡頭先拉近入口，再拉遠到全景`, zStart > zEnd * 2, `縮放 ${zStart.toFixed(2)} → ${zEnd.toFixed(2)}`);
+    await page.waitForTimeout(800);
     const wel = page.locator('#welcome');
     const welText = await wel.innerText();
     const overlap = await page.evaluate(() => {

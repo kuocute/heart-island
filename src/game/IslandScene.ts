@@ -147,6 +147,8 @@ export class IslandScene {
   private ready = false;
   private adj = new Map<string, string[]>();
   timeOfDay: TimeOfDay = 'day';
+  /** 進島開場：鏡頭先停在入口，這個時間點後慢慢拉遠到全景（0 表示沒有開場） */
+  private introUntil = 0;
   reducedMotion = false;
 
   constructor(
@@ -389,6 +391,10 @@ export class IslandScene {
         this.target.z += (p.z - this.target.z) * 0.06;
       }
     }
+    if (this.introUntil && now > this.introUntil) {
+      const az = this.az;
+      this.moveTo(this.center(), this.panoramaDist(az), true, az, 1800);
+    }
     if (this.anim) {
       const k = Math.min(1, (now - this.anim.t0) / this.anim.dur);
       const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
@@ -539,7 +545,7 @@ export class IslandScene {
       return;
     }
     this.nav.goTo(id, nodeId);
-    if (this.nav.moving) { this.following = true; this.anim = null; }
+    if (this.nav.moving) { this.following = true; this.anim = null; this.introUntil = 0; }
   }
 
   /** 從清單直接開啟任務時，角色直接出現在該站（不播放動畫、不觸發抵達事件） */
@@ -574,6 +580,7 @@ export class IslandScene {
   panBy(dx: number, dy: number) {
     this.stopFollow();
     this.anim = null;
+    this.introUntil = 0;
     const ppu = this.zoom;
     const c = Math.cos(this.az), s = Math.sin(this.az);
     const right = dx / ppu, back = dy / ppu / Math.sin(ELEV);
@@ -598,7 +605,8 @@ export class IslandScene {
     return Math.max(needH, needW) * (az % (Math.PI * 2) === 0 ? 1.05 : 1.14);
   }
 
-  private moveTo(target: THREE.Vector3, dist: number, animate: boolean, az = this.anim?.toA ?? this.az) {
+  private moveTo(target: THREE.Vector3, dist: number, animate: boolean, az = this.anim?.toA ?? this.az, dur = 500) {
+    this.introUntil = 0;
     this.clampTarget(target);
     if (!animate || this.reducedMotion) {
       this.anim = null;
@@ -607,12 +615,26 @@ export class IslandScene {
       this.az = az;
       return;
     }
-    this.anim = { t0: performance.now(), dur: 500, fromT: this.target.clone(), toT: target.clone(), fromD: this.dist, toD: dist, fromA: this.az, toA: az };
+    this.anim = { t0: performance.now(), dur, fromT: this.target.clone(), toT: target.clone(), fromD: this.dist, toD: dist, fromA: this.az, toA: az };
   }
 
   private center() {
     return new THREE.Vector3(ISLAND_BOUNDS.x + ISLAND_BOUNDS.w / 2, 0, ISLAND_BOUNDS.y + ISLAND_BOUNDS.h / 2 + 20);
   }
+
+  /**
+   * 進島開場：鏡頭先拉近到入口（貓咪與 01 站），停留一下再慢慢拉遠到全景。
+   * 使用者拖曳、縮放、旋轉或走動時立即取消；減少動態效果時直接顯示全景。
+   */
+  introFly(x: number, z: number) {
+    if (this.reducedMotion) { this.panorama(false); return; }
+    this.stopFollow();
+    this.moveTo(new THREE.Vector3(x, 0, z + 10), Math.max(320, this.panoramaDist() / 3.2), false, 0);
+    this.introUntil = performance.now() + 2600;
+  }
+
+  /** 鏡頭是否已停止移動（開場與動畫都結束），測試用 */
+  get cameraSettled() { return !this.anim && !this.introUntil; }
 
   panorama(animate = !this.reducedMotion) {
     this.stopFollow();
@@ -629,13 +651,14 @@ export class IslandScene {
   /** 雙指縮放：立即套用 */
   zoomImmediate(factor: number) {
     this.anim = null;
+    this.introUntil = 0;
     this.dist = THREE.MathUtils.clamp(this.dist / factor, 260, this.panoramaDist() * 1.25);
   }
 
   /** 旋轉視角（度）；animate=false 用於雙指旋轉 */
   rotateBy(deg: number, animate = true) {
     const toA = (this.anim?.toA ?? this.az) + THREE.MathUtils.degToRad(deg);
-    if (!animate) { this.anim = null; this.az = toA; return; }
+    if (!animate) { this.anim = null; this.introUntil = 0; this.az = toA; return; }
     // 在全景距離附近時，轉完自動重新取景，讓整座島仍在畫面中
     const d = this.anim?.toD ?? this.dist;
     const nearPano = d >= this.panoramaDist() * 0.85;
