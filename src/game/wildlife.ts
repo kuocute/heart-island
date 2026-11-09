@@ -12,9 +12,9 @@ export type TimeOfDay = 'morning' | 'day' | 'night';
 /** 動物與海洋生物的位置（相對於所在島中心，避開步道節點與小屋） */
 export const WILDLIFE_SPOTS = {
   /** 入口：醫院主樓大門右側，玩家一進島就在旁邊 */
-  cat: { tile: 'decor-hospital', dx: 32, dz: 20, yaw: -0.45, near: 85, scale: 1.35 },
+  cat: { tile: 'decor-hospital', dx: 34, dz: 18, yaw: -0.45, near: 90, scale: 2 },
   /** 返家照護站：回家之門左側柱子旁、步道外側 */
-  dog: { tile: 'home-care', dx: -22, dz: 16, yaw: 0.25, near: 95, scale: 1.3 },
+  dog: { tile: 'home-care', dx: -20, dz: 20, yaw: 0.3, near: 100, scale: 1.95 },
   /** 淺水魚群：出院碼頭與心尖之間的海灣 */
   fish: { x: 392, y: 736, rx: 20, ry: 11, count: 8 },
   /** 海龜：右下外海 */
@@ -22,14 +22,14 @@ export const WILDLIFE_SPOTS = {
 };
 
 const FOAM: Record<TimeOfDay, { color: string; opacity: number }> = {
-  morning: { color: '#fff1e2', opacity: 0.8 },
-  day: { color: '#ffffff', opacity: 0.85 },
-  night: { color: '#b9cdf5', opacity: 0.5 },
+  morning: { color: '#fff8f0', opacity: 1 },
+  day: { color: '#ffffff', opacity: 1 },
+  night: { color: '#c9daff', opacity: 0.7 },
 };
 const FISH: Record<TimeOfDay, { color: string; opacity: number }> = {
-  morning: { color: '#3d6e78', opacity: 0.42 },
-  day: { color: '#1f5f73', opacity: 0.45 },
-  night: { color: '#0b2236', opacity: 0.55 },
+  morning: { color: '#2f5f6b', opacity: 0.6 },
+  day: { color: '#164f62', opacity: 0.62 },
+  night: { color: '#0b2236', opacity: 0.7 },
 };
 
 const ico = (r: number, color: string, sx = 1, sy = 1, sz = 1) => {
@@ -210,7 +210,7 @@ const FOAM_VERT = /* glsl */ `
   void main() {
     float p = fract(uTime * 0.11 + aPhase);
     float dist = mix(46.0, 3.0, p);            // 從外海慢慢推向岸邊
-    vec3 pos = position + vec3(aNormal.x, 0.0, aNormal.y) * (dist + aSide * mix(8.0, 3.5, p));
+    vec3 pos = position + vec3(aNormal.x, 0.0, aNormal.y) * (dist + aSide * mix(14.0, 6.0, p));
     vAlpha = smoothstep(0.0, 0.3, p) * (1.0 - smoothstep(0.72, 1.0, p)) * sin(3.14159 * aU);
     vSide = aSide;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -222,7 +222,7 @@ const FOAM_FRAG = /* glsl */ `
   varying float vSide;
   void main() {
     float edge = 1.0 - abs(vSide - 0.5) * 2.0;
-    gl_FragColor = vec4(uColor, uOpacity * vAlpha * (0.45 + 0.55 * edge));
+    gl_FragColor = vec4(uColor, min(1.0, uOpacity * vAlpha * (0.6 + 0.6 * edge)));
   }`;
 
 /** 找出心形島的外圍海岸線，每段海岸放兩道前後錯開的浪花 */
@@ -391,7 +391,7 @@ export class Wildlife {
       this.dummy.position.set(x, SEA_LEVEL + 1.9, z);
       // 沿切線方向前進
       this.dummy.rotation.set(0, Math.atan2(-Math.sin(a) * F.rx, Math.cos(a) * F.ry) + Math.sin(t * 6 + i) * 0.12, 0);
-      this.dummy.scale.setScalar(0.85 + (i % 3) * 0.12);
+      this.dummy.scale.setScalar(1.25 + (i % 3) * 0.15);
       this.dummy.updateMatrix();
       this.fish.setMatrixAt(i, this.dummy.matrix);
     }

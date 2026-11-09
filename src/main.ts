@@ -375,6 +375,9 @@ $('start-btn').addEventListener('click', () => {
     intro.hidden = true;
     announce(status, `以「${ROLE_TEXT[role]}」角色從醫院大門出發，第一站是「01 入院評估花園」。點島嶼或使用清單前往。`);
     showWelcome();
+    // 開場：鏡頭先停在入口（貓咪、歡迎提示、01 站），再慢慢拉遠到全景
+    const c = WILDLIFE_SPOTS.cat, ct = tileOf(c.tile);
+    scene?.introFly((ct.x + tileOf('admission').x) / 2, (ct.y + c.dz + tileOf('admission').y) / 2);
     labelBtns.get('admission')?.focus();
   };
   if (!progress.role) pickRole($('start-btn'), () => { if (progress.role) finish(); });
@@ -494,6 +497,7 @@ window.__hfIsland = {
   get zoom() { return scene ? scene.zoom : null; },
   get angle() { return scene ? scene.angle : null; },
   get wildlife() { return scene ? scene.wildlifeState : null; },
+  get cameraSettled() { return scene ? scene.cameraSettled : false; },
   focusWorld(x: number, y: number) { scene?.focusWorld(x, y); },
   /** 貓或狗在視窗中的座標 */
   wildlifePoint(name: 'cat' | 'dog') {
