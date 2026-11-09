@@ -462,6 +462,49 @@ try {
     execSync('rm -rf dist-portal-test dist-bad-test');
   }
 
+  // ───── 12. 14 進階心衰醫療港：醫病共享決策（SDM）引導卡 ─────
+  for (const [w, hgt, touch] of [[390, 844, true], [1280, 800, false]]) {
+    const SDM = 'https://apps.chimei.org.tw/sdm/survey_doit.aspx?X=c6zuS';
+    const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
+    // 測試環境不連外：攔截奇美頁面，回傳一頁替代內容，只驗證「有在新分頁開啟正確網址」
+    await ctx.route('https://apps.chimei.org.tw/**', (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><title>SDM（測試替身）</title><h1>奇美醫院 SDM（測試替身）</h1>' }));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
+    await page.goto(BASE);
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, 'caregiver');
+    await page.click('#station-list-open');
+    await page.locator('.station-row[data-station=advanced-hf]').click();
+    await dialog(page).waitFor();
+    const card = dialog(page).locator('[data-sdm=card]');
+    const cardText = (await card.innerText()).replace(/\s+/g, '');
+    const firstEl = await dialog(page).locator('.tabpanel > *').first().getAttribute('data-sdm');
+    check(`12a [${w}px] 第 14 站最上方顯示 SDM 引導卡與指定文字`, firstEl === 'card' && cardText.includes('先和醫療團隊談談你的照護選擇') && cardText.includes('面對下一步的照護，你最在意什麼？可以和家人一起使用這個工具，把想問的問題記下來，下次與醫療團隊討論。') && cardText.includes('開始醫病共享決策（SDM）') && cardText.includes('先了解照護選項'));
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.['advanced-hf'] ?? null);
+    const link = dialog(page).locator('a[data-sdm=open]');
+    const attrs = { href: await link.getAttribute('href'), target: await link.getAttribute('target'), rel: await link.getAttribute('rel') };
+    const [popup] = await Promise.all([ctx.waitForEvent('page', { timeout: 20000 }), touch ? link.tap() : link.click()]);
+    await popup.waitForLoadState('domcontentloaded').catch(() => {});
+    const popupUrl = popup.url();
+    const popupTitle = await popup.title().catch(() => '');
+    check(`12b [${w}px] 「開始醫病共享決策（SDM）」在新分頁開啟奇美 SDM 頁面`, attrs.href === SDM && attrs.target === '_blank' && /noopener/.test(attrs.rel) && /noreferrer/.test(attrs.rel) && popupUrl === SDM && popupTitle.includes('SDM'), popupUrl);
+    await popup.close();
+    await page.bringToFront();
+    const stillOpen = (await dialog(page).getAttribute('data-station')) === 'advanced-hf' && (await card.isVisible());
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.['advanced-hf'] ?? null);
+    const labelState = await page.locator('.map-label[data-station=advanced-hf]').getAttribute('data-state');
+    check(`12c [${w}px] 返回後第 14 站仍開著；點開問卷不會記為已完成`, stillOpen && JSON.stringify(before) === JSON.stringify(after) && (after?.practiced ?? []).length === 0 && labelState !== 'practiced', `${JSON.stringify(after)} ${labelState}`);
+    await (touch ? dialog(page).locator('[data-sdm=learn]').tap() : dialog(page).locator('[data-sdm=learn]').click());
+    await page.waitForTimeout(800);
+    const focused = await page.evaluate(() => document.activeElement?.id);
+    const inView = await page.evaluate(() => { const el = document.getElementById('learn-advanced-hf'); const r = el.getBoundingClientRect(); const box = el.closest('.modal-body').getBoundingClientRect(); return r.top >= box.top - 2 && r.top < box.bottom; });
+    check(`12d [${w}px] 「先了解照護選項」帶到本港原有的衛教內容`, focused === 'learn-advanced-hf' && inView, `焦點=${focused}`);
+    await dialog(page).getByRole('button', { name: /進入：左心室輔助器/ }).click();
+    const readOn = await dialog(page).locator('.step-heading').first().innerText();
+    check(`12e [${w}px] 返回後可以繼續閱讀第 14 站（進入展館）`, (await dialog(page).innerText()).includes('左心室輔助器') && readOn.length > 0);
+    await ctx.close();
+  }
+
   // ───── 7. 未登入者無法取得院內工作卡連結或內部資料 ─────
   {
     execSync('npx vite build --outDir dist-staff-test --emptyOutDir', { env: { ...process.env, VITE_STAFF_API_BASE: '/staff/api' }, stdio: 'ignore' });

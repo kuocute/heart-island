@@ -7,6 +7,8 @@ import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progres
 import { announce, h, openModal, type ModalHandle } from './modal';
 import { renderStaffCard } from './staffCard';
 import { renderPortalEntry } from './portalEntry';
+import { renderSdmCard } from './sdmCard';
+import { SDM_CARD } from '../content/sdm';
 import { PORTAL_STATION } from '../staff/portal';
 
 type Tab = 'practice' | 'staff';
@@ -142,6 +144,18 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       view.append(panel);
       return;
     }
+    // 「14｜進階心衰醫療港」最上方：醫病共享決策引導卡（只提供入口，不影響進度）
+    const learnId = `learn-${station.id}`;
+    if (station.id === SDM_CARD.station) {
+      panel.append(renderSdmCard(() => {
+        const target = document.getElementById(learnId);
+        if (!target) return;
+        const reduce = document.documentElement.classList.contains('reduce-motion') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        target.focus({ preventScroll: true });
+        announce(live, '已帶到本港的照護選項：左心室輔助器館與心臟移植館。');
+      }));
+    }
     panel.append(
       h('p', { class: `zone-chip ${station.zone}` }, station.zone === 'hospital' ? '住院區' : '居家區', `・${station.subtitle}`),
       heading(station.subtitle, 'sr-only-heading'),
@@ -149,7 +163,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       h('p', { class: 'role-tip' }, h('strong', {}, `${ROLE_TEXT[role]}提示：`), station.roleTips[role]),
       station.id === PORTAL_STATION ? renderPortalEntry() : '',
       station.notice ? h('p', { class: 'notice' }, station.notice) : '',
-      h('h4', {}, '本站照護重點'),
+      h('h4', { id: learnId, tabindex: '-1', class: 'learn-anchor' }, '本站照護重點'),
       h('ul', { class: 'item-grid' }, ...station.items.map((it, i) => h('li', {},
         h('button', { type: 'button', class: 'item-card', 'data-item': it.id, onclick: () => go({ kind: 'item', itemId: it.id }) },
           h('span', { class: 'item-no', 'aria-hidden': 'true' }, String(i + 1)),

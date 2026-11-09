@@ -180,3 +180,25 @@ describe('醫護人員專區入口網址', () => {
     ]) expect(checkPortalUrl(bad)?.ok, bad).toBe(false);
   });
 });
+
+import { SDM_CARD } from '../src/content/sdm';
+import { readFileSync } from 'node:fs';
+
+describe('醫病共享決策（SDM）引導卡', () => {
+  it('放在 14 進階心衰醫療港，文字與網址正確', () => {
+    expect(SDM_CARD.station).toBe('advanced-hf');
+    expect(STATIONS.find((s) => s.id === SDM_CARD.station)?.no).toBe('14');
+    expect(SDM_CARD.title).toBe('先和醫療團隊談談你的照護選擇');
+    expect(SDM_CARD.text).toBe('面對下一步的照護，你最在意什麼？可以和家人一起使用這個工具，把想問的問題記下來，下次與醫療團隊討論。');
+    expect(SDM_CARD.primaryLabel).toBe('開始醫病共享決策（SDM）');
+    expect(SDM_CARD.secondaryLabel).toBe('先了解照護選項');
+    const u = new URL(SDM_CARD.url);
+    expect(u.protocol).toBe('https:');
+    expect(u.hostname).toBe('apps.chimei.org.tw');
+    expect(SDM_CARD.url).toBe('https://apps.chimei.org.tw/sdm/survey_doit.aspx?X=c6zuS');
+  });
+  it('引導卡只提供入口，不會寫入任何進度', () => {
+    const src = readFileSync('src/ui/sdmCard.ts', 'utf8');
+    expect(src).not.toMatch(/progress|setPracticed|markExplored|localStorage/);
+  });
+});
