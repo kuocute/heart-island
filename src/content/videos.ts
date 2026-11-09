@@ -38,5 +38,24 @@ export function youtubeId(url: string): string | null {
   return null;
 }
 
-/** 站內嵌入用網址：隱私加強模式、不自動播放、手機在頁面內播放 */
-export const embedUrl = (id: string) => `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1&modestbranding=1`;
+export const EMBED_ORIGIN = 'https://www.youtube.com';
+
+/**
+ * 站內嵌入用網址（YouTube 官方內嵌網址 www.youtube.com/embed/ID）。
+ * 不自動播放；playsinline 讓手機在頁面內播放；enablejsapi + origin 讓播放器回報錯誤碼（153、101／150）。
+ * 短網址 youtu.be 只給「在 YouTube 開啟」按鈕使用。
+ */
+export function embedUrl(id: string, origin?: string): string {
+  const q = new URLSearchParams({ rel: '0', playsinline: '1', enablejsapi: '1' });
+  if (origin && /^https?:\/\//.test(origin)) q.set('origin', origin);
+  return `${EMBED_ORIGIN}/embed/${id}?${q}`;
+}
+
+/** YouTube 播放器錯誤碼 → 給使用者看的說明 */
+export function playerErrorText(code: number): string {
+  if (code === 101 || code === 150) return `這支影片的擁有者不允許在其他網站播放（錯誤 ${code}）。請按「在 YouTube 開啟」觀看。`;
+  if (code === 153) return '播放器沒有收到網站來源資訊，無法在站內播放（錯誤 153）。請按「在 YouTube 開啟」觀看。';
+  if (code === 100) return '找不到這支影片，可能已移除或設為私人（錯誤 100）。';
+  if (code === 2 || code === 5) return `播放器無法載入這支影片（錯誤 ${code}）。請按「在 YouTube 開啟」觀看。`;
+  return `影片暫時無法在站內播放（錯誤 ${code}）。請按「在 YouTube 開啟」觀看。`;
+}

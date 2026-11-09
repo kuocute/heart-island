@@ -2,7 +2,7 @@
 // 有衛教卡的站（返家照護站）：讀衛教卡 → 情境練習 → 看回饋與原因（答錯可重試）→ 答對即完成。
 // 一次只呈現目前一步；知識題正誤同時用文字表示；照護偏好題不計分、不儲存選項。
 import { CARE_LINKS } from '../content/links';
-import { STATION_VIDEO, embedUrl, youtubeId } from '../content/videos';
+import { EMBED_ORIGIN, STATION_VIDEO, embedUrl, playerErrorText, youtubeId } from '../content/videos';
 import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId } from '../content/types';
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
 import { announce, h, openModal, type ModalHandle } from './modal';
@@ -194,13 +194,17 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
     } else {
       const vid = youtubeId(chosen.url);
       view.append(h('p', { class: 'video-current' }, '影片語言：', h('strong', { lang: chosen.lang }, chosen.label)));
+      const status = h('p', { class: 'video-status', role: 'status', 'data-video': 'status', hidden: true });
       if (vid) {
-        view.append(h('div', { class: 'video-frame' }, h('iframe', {
-          src: embedUrl(vid), title: `出院照護影片（${chosen.label}）`, loading: 'lazy',
+        const frame = h('iframe', {
+          src: embedUrl(vid, location.origin), title: `出院照護影片（${chosen.label}）`,
           allow: 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
           allowfullscreen: true, referrerpolicy: 'strict-origin-when-cross-origin', 'data-video': 'player',
-        })));
+        });
+        watchPlayer(frame, status);
+        view.append(h('div', { class: 'video-frame' }, frame));
       }
+      view.append(status);
       view.append(
         h('div', { class: 'video-actions' },
           h('button', { type: 'button', class: 'btn btn-secondary', 'data-video': 'switch', onclick: () => { refocusLang = chosen.id; go({ kind: 'video' }); } }, '切換語言'),
@@ -211,6 +215,34 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
     }
     view.append(h('div', { class: 'actions' },
       h('button', { type: 'button', class: 'btn btn-primary btn-block', 'data-video': 'continue', onclick: () => go({ kind: 'intro', tab: defaultTab }) }, V.continueLabel)));
+  }
+
+  /**
+   * 聽 YouTube 播放器回報（enablejsapi）。錯誤碼 153／101／150 等會顯示在播放器下方；
+   * 若播放器一直沒有回應（例如被瀏覽器或網路阻擋），提示改用「在 YouTube 開啟」。
+   */
+  let stopWatching: (() => void) | null = null;
+  function watchPlayer(frame: HTMLIFrameElement, status: HTMLElement) {
+    stopWatching?.();
+    let ready = false;
+    const show = (text: string) => { status.textContent = text; status.hidden = false; frame.dataset.state = 'error'; };
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== EMBED_ORIGIN || e.source !== frame.contentWindow) return;
+      let d: { event?: string; info?: unknown };
+      try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+      if (!d || typeof d !== 'object') return;
+      if (d.event === 'onError') show(playerErrorText(Number(d.info)));
+      else if (d.event === 'onReady' || d.event === 'initialDelivery' || d.event === 'infoDelivery') {
+        if (!ready) { ready = true; frame.dataset.state = frame.dataset.state === 'error' ? 'error' : 'ready'; }
+      }
+    };
+    const hello = () => frame.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'hf-discharge-video', channel: 'widget' }), EMBED_ORIGIN);
+    frame.addEventListener('load', () => { hello(); setTimeout(hello, 400); });
+    const timer = window.setTimeout(() => { if (!ready && frame.isConnected && frame.dataset.state !== 'error') show('播放器沒有回應，可能被網路或瀏覽器阻擋。請按「在 YouTube 開啟」觀看。'); }, 12000);
+    window.addEventListener('message', onMsg);
+    stopWatching = () => { window.removeEventListener('message', onMsg); clearTimeout(timer); };
+    const mo = new MutationObserver(() => { if (!frame.isConnected) { stopWatching?.(); stopWatching = null; mo.disconnect(); } });
+    mo.observe(document.body, { childList: true, subtree: true });
   }
 
   // ───────── 照護重點 ─────────

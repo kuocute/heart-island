@@ -414,7 +414,16 @@ try {
     const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
     // 測試環境不連外：攔截 YouTube，播放器與新分頁都回傳替身頁，只驗證網址與流程
     const stub = (t) => (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<!doctype html><title>${t}</title><p>${t}</p>` });
-    await ctx.route('https://www.youtube-nocookie.com/**', stub('YouTube 播放器（測試替身）'));
+    // 播放器替身：收到 listening 後，照 YouTube enablejsapi 的格式回報 onReady 或 onError；同時記錄送出的 Referer
+    let playerError = 0;
+    const embedReqs = [];
+    const playerStub = async (route) => {
+      const hd = await route.request().allHeaders();
+      embedReqs.push({ url: route.request().url(), referer: hd.referer ?? '' });
+      const code = playerError;
+      await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<!doctype html><title>YouTube 播放器（測試替身）</title><p>播放器替身</p><script>addEventListener('message',function(e){try{var d=JSON.parse(e.data);if(d.event==='listening')parent.postMessage(JSON.stringify(${code} ? {event:'onError',info:${code}} : {event:'onReady'}),'*');}catch(x){}});</script>` });
+    };
+    await ctx.route('https://www.youtube.com/embed/**', playerStub);
     await ctx.route('https://youtu.be/**', stub('YouTube（測試替身）'));
     const page = await ctx.newPage();
     page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
@@ -443,16 +452,34 @@ try {
       await pop.close();
       await page.bringToFront();
       const current = await dialog(page).locator('.video-current').innerText();
-      const ok = src.startsWith(`https://www.youtube-nocookie.com/embed/${vid}?`) && !/autoplay=1/.test(src) && href === url && target === '_blank' && /noopener/.test(rel) && /noreferrer/.test(rel) && popUrl === url && current.includes(label);
-      if (!ok) { allOk = false; detail += `${label}: ${src} ${href} ${popUrl}；`; }
+      await page.waitForFunction(() => document.querySelector('iframe[data-video=player]')?.dataset.state === 'ready', null, { timeout: 15000 }).catch(() => {});
+      const pstate = await frame.getAttribute('data-state');
+      const req = embedReqs.filter((r) => r.url.includes(`/embed/${vid}`)).pop();
+      const origin = new URL(BASE).origin;
+      const ok = src.startsWith(`https://www.youtube.com/embed/${vid}?`) && !/autoplay=1/.test(src) && new URL(src).searchParams.get('enablejsapi') === '1' && new URL(src).searchParams.get('origin') === origin
+        && pstate === 'ready' && (req?.referer ?? '').startsWith(origin) && (await frame.getAttribute('referrerpolicy')) === 'strict-origin-when-cross-origin' && href === url && target === '_blank' && /noopener/.test(rel) && /noreferrer/.test(rel) && popUrl === url && current.includes(label);
+      if (!ok) { allOk = false; detail += `${label}: ${src} state=${pstate} referer=${req?.referer} ${href} ${popUrl}；`; }
       await tap(dialog(page).locator('[data-video=switch]'));
       await dialog(page).locator('.lang-btn').first().waitFor();
       const back = (await dialog(page).locator('iframe').count()) === 0 && (await page.evaluate((x) => document.activeElement?.getAttribute('data-lang') === x, id));
       if (!back) { allOk = false; detail += `${label}: 切換語言失敗；`; }
     }
-    check(`13b [${w}px] 五種語言：站內播放器對應影片、不自動播放；「在 YouTube 開啟」新分頁網址正確；「切換語言」回到語言選擇`, allOk, detail);
+    check(`13b [${w}px] 五種語言：iframe 用 www.youtube.com/embed/影片ID、送出 Referer、播放器回報就緒、不自動播放；「在 YouTube 開啟」新分頁網址正確；「切換語言」回到語言選擇`, allOk, detail);
     const before = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.discharge ?? null);
     check(`13c [${w}px] 選擇語言只切換影片，不寫入進度`, (before?.practiced ?? []).length === 0, JSON.stringify(before));
+    // 播放器回報錯誤碼時，站內顯示原因，按鈕仍可用
+    let errOk = true, errDetail = '';
+    for (const [code, want] of [[150, '擁有者不允許'], [101, '擁有者不允許'], [153, '網站來源資訊']]) {
+      playerError = code;
+      await tap(dialog(page).locator('.lang-btn[data-lang="zh"]'));
+      const st = dialog(page).locator('[data-video=status]');
+      await st.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      const txt = (await st.isVisible()) ? await st.innerText() : '';
+      if (!(txt.includes(want) && txt.includes(String(code)) && txt.includes('在 YouTube 開啟') && (await dialog(page).locator('a[data-video=youtube]').isVisible()))) { errOk = false; errDetail += `${code}: ${txt}；`; }
+      await tap(dialog(page).locator('[data-video=switch]'));
+    }
+    playerError = 0;
+    check(`13g [${w}px] 播放器回報錯誤 150／101／153 時，站內說明原因並保留「在 YouTube 開啟」`, errOk, errDetail);
     // 選韓文後繼續回覆示教 → 原本出院碼頭的任務流程
     await tap(dialog(page).locator('.lang-btn[data-lang="ko"]'));
     await tap(dialog(page).locator('[data-video=continue]'));

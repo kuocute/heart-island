@@ -92,6 +92,11 @@ npm run test:e2e       # 瀏覽器端到端驗證（需要電腦已安裝 Chrome
 - 選擇語言只切換影片，不寫入任何進度；站點是否完成仍依原本的任務流程判定。
 - 修改影片或新增語言：`src/content/videos.ts`。
 
+- 站內播放器使用 YouTube 官方內嵌網址 `https://www.youtube.com/embed/影片ID`（附 `enablejsapi=1` 與網站 `origin`）；`youtu.be` 短網址只給「在 YouTube 開啟」。
+- 網站與 iframe 都用 `strict-origin-when-cross-origin` 送出 Referer（`index.html` 有 `<meta name="referrer">`）。請勿改成 `no-referrer`，否則 YouTube 會顯示錯誤 153。
+- 播放器回報錯誤時，站內會顯示原因：153＝缺少網站來源資訊；101／150＝影片擁有者不允許內嵌。
+- Claude 私人預覽頁的安全設定只允許載入自己網域的框架，YouTube 會被擋成灰色破頁圖示；請在 GitHub Pages 或本機 `npm run dev` 確認播放。
+
 ## 修改站點座標與步道
 
 全部放在 `src/game/mapData.ts`：

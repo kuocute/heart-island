@@ -81,6 +81,18 @@ describe('05 出院碼頭照護影片', () => {
     expect(youtubeId('https://www.youtube.com/watch?v=CVxv18oN3IE')).toBe('CVxv18oN3IE');
     expect(youtubeId('https://example.com/x')).toBeNull();
     expect(embedUrl('CVxv18oN3IE')).not.toMatch(/autoplay=1/);
+    expect(embedUrl('CVxv18oN3IE')).toMatch(/^https:\/\/www\.youtube\.com\/embed\/CVxv18oN3IE\?/);
+    expect(new URL(embedUrl('CVxv18oN3IE', 'https://kuocute.github.io')).searchParams.get('origin')).toBe('https://kuocute.github.io');
+    expect(new URL(embedUrl('CVxv18oN3IE', 'null')).searchParams.has('origin')).toBe(false);
+  });
+});
+
+describe('YouTube 播放器錯誤說明', () => {
+  it('153、101／150 都有對應的說明', async () => {
+    const { playerErrorText } = await import('../src/content/videos');
+    expect(playerErrorText(153)).toContain('網站來源');
+    expect(playerErrorText(150)).toContain('擁有者不允許');
+    expect(playerErrorText(101)).toContain('擁有者不允許');
   });
 });
 
