@@ -152,3 +152,31 @@ describe('探索狀態', () => {
     expect(stationStatus({ explored: true, practiced: ['a'] }, ['a'])).toBe('practiced');
   });
 });
+
+import { checkPortalUrl } from '../src/staff/portalUrl';
+
+describe('醫護人員專區入口網址', () => {
+  it('未設定時回傳 null（畫面顯示「尚未開放」）', () => {
+    expect(checkPortalUrl(undefined)).toBeNull();
+    expect(checkPortalUrl('  ')).toBeNull();
+  });
+  it('接受需院內帳號登入的 https 入口', () => {
+    expect(checkPortalUrl('https://intranet.example.org/hf/guidelines')).toEqual({ ok: true, url: 'https://intranet.example.org/hf/guidelines' });
+    expect(checkPortalUrl('https://contoso.sharepoint.com/sites/HF/SitePages/Home.aspx')?.ok).toBe(true);
+  });
+  it('拒絕 NotebookLM、Google 文件、匿名分享、非 https、帶帳密或邀請碼的網址', () => {
+    for (const bad of [
+      'https://notebooklm.google.com/notebook/abc',
+      'https://docs.google.com/document/d/abc',
+      'https://drive.google.com/file/d/abc',
+      'https://1drv.ms/b/s!abc',
+      'https://contoso.sharepoint.com/sites/HF/_layouts/15/guestaccess.aspx?share=abc',
+      'https://onedrive.live.com/redir?resid=abc&authkey=xyz',
+      'http://intranet.example.org/hf',
+      'https://user:pass@intranet.example.org/hf',
+      'https://intranet.example.org/hf?invite=1234',
+      'https://intranet.example.org/hf?token=abc',
+      'not a url',
+    ]) expect(checkPortalUrl(bad)?.ok, bad).toBe(false);
+  });
+});

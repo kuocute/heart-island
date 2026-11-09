@@ -3,6 +3,7 @@
 import type { Station } from '../content/types';
 import { STAFF_FIELDS, loadStaffState, safeHttpsUrl, type StaffState } from '../staff/staffApi';
 import { announce, h } from './modal';
+import { renderPortalEntry } from './portalEntry';
 
 const PENDING = '待確認';
 
@@ -30,6 +31,7 @@ export function renderStaffCard(station: Station, live: HTMLElement): HTMLElemen
   const staff = station.staff ?? { topics: [], query: '' };
   const statusLine = h('p', { class: 'staff-status' }, '讀取中…');
   const linkSlot = h('div', { class: 'staff-actions' });
+  const portalSlot = h('div', { class: 'staff-portal' });
   const table = h('dl', { class: 'staff-fields' });
   const fill = (state: StaffState) => {
     const values = state.kind === 'ok' ? state.data.stations[station.id] ?? {} : {};
@@ -40,11 +42,13 @@ export function renderStaffCard(station: Station, live: HTMLElement): HTMLElemen
       }),
     );
     linkSlot.replaceChildren();
+    // 筆記本連結只有在「院內受保護的工作頁」登入後，由伺服器提供時才顯示；
+    // 公開網站一律改走「醫護人員專區｜院內帳號登入」，由院方平台驗證帳號與權限。
     const url = state.kind === 'ok' ? safeHttpsUrl(state.data.notebookUrl) : null;
     if (url) {
       linkSlot.append(h('a', { class: 'btn btn-secondary', href: url, target: '_blank', rel: 'noopener noreferrer' }, '開啟疾病認證筆記本', h('span', { class: 'sr-only' }, '（另開新視窗）')));
     } else {
-      linkSlot.append(h('button', { type: 'button', class: 'btn btn-secondary', disabled: true, 'aria-describedby': `staff-why-${station.id}` }, '開啟疾病認證筆記本'));
+      portalSlot.replaceChildren(renderPortalEntry({ compact: true }));
     }
     linkSlot.append(
       h('button', {
@@ -56,8 +60,8 @@ export function renderStaffCard(station: Station, live: HTMLElement): HTMLElemen
     const why = h('p', { id: `staff-why-${station.id}`, class: 'small muted' });
     switch (state.kind) {
       case 'unconfigured':
-        statusLine.textContent = '此原型尚未連結院內身分驗證，只展示版型與查詢文字。';
-        why.textContent = '筆記本連結由院方在受保護的醫療人員環境設定，不放在病友端網頁。';
+        statusLine.textContent = '公開網站只展示版型與查詢文字。院內規範請由上方「醫護人員專區｜院內帳號登入」進入。';
+        why.textContent = '院內文件、規範全文與筆記本連結只放在院方核准的入口平台，不放在公開網頁。';
         break;
       case 'unauthorized':
         statusLine.replaceChildren('請先登入院內醫療人員工作頁，才能看到筆記本連結與查核資料。 ', h('a', { href: state.loginUrl }, '前往登入'));
@@ -79,6 +83,7 @@ export function renderStaffCard(station: Station, live: HTMLElement): HTMLElemen
     h('h3', { id: `staff-h-${station.id}` }, '醫護規範卡'),
     h('p', { class: 'small muted' }, '提供醫護人員在本站對照疾病認證規範使用。未查核的項目標示「待確認」。'),
     statusLine,
+    portalSlot,
     h('h4', {}, '本站相關查核主題'),
     h('ul', { class: 'staff-topics' }, ...staff.topics.map((t) => h('li', {}, t))),
     h('p', { class: 'small muted' }, '以上為建議查核方向，須對照院內核定文件確認。'),

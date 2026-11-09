@@ -6,6 +6,8 @@ import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId } from 
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
 import { announce, h, openModal, type ModalHandle } from './modal';
 import { renderStaffCard } from './staffCard';
+import { renderPortalEntry } from './portalEntry';
+import { PORTAL_STATION } from '../staff/portal';
 
 type Tab = 'practice' | 'staff';
 type Step =
@@ -145,6 +147,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       heading(station.subtitle, 'sr-only-heading'),
       h('p', { class: 'scene' }, station.scene),
       h('p', { class: 'role-tip' }, h('strong', {}, `${ROLE_TEXT[role]}提示：`), station.roleTips[role]),
+      station.id === PORTAL_STATION ? renderPortalEntry() : '',
       station.notice ? h('p', { class: 'notice' }, station.notice) : '',
       h('h4', {}, '本站照護重點'),
       h('ul', { class: 'item-grid' }, ...station.items.map((it, i) => h('li', {},
