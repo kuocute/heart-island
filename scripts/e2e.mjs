@@ -436,7 +436,7 @@ try {
     const title = await dialog(page).locator('.step-heading').first().innerText();
     const labels = await dialog(page).locator('.lang-btn').allInnerTexts();
     const autoplayFree = (await dialog(page).locator('iframe').count()) === 0;
-    check(`13a [${w}px] 進站第一個畫面：「出院前，先看一段照護影片」與五個語言按鈕（尚未載入影片）`, title === '出院前，先看一段照護影片' && JSON.stringify(labels) === JSON.stringify(VIDEOS.map((v) => v[0])) && autoplayFree, labels.join('／'));
+    check(`13a [${w}px] 進站第一個畫面：「出院前，請選擇您想觀看的影片語言」與五個語言按鈕（尚未載入影片）`, title === '出院前，請選擇您想觀看的影片語言' && JSON.stringify(labels) === JSON.stringify(VIDEOS.map((v) => v[0])) && autoplayFree, labels.join('／'));
     let allOk = true;
     let detail = '';
     for (const [label, id, url, vid] of VIDEOS) {
@@ -503,7 +503,30 @@ try {
     await tap(dialog(page).locator('[data-video=continue]'));
     await tap(dialog(page).locator('[data-video=again]'));
     const again2 = await dialog(page).locator('.step-heading').first().innerText();
-    check(`13f [${w}px] 再次進站先顯示影片；任務頁可「再看一次照護影片」`, again === '出院前，先看一段照護影片' && again2 === '出院前，先看一段照護影片');
+    check(`13f [${w}px] 再次進站先顯示影片；任務頁可「再看一次照護影片」`, again === '出院前，請選擇您想觀看的影片語言' && again2 === '出院前，請選擇您想觀看的影片語言');
+    // 停在播放器畫面時關閉，再從地圖進站：回到語言選擇，不保留上次的播放器
+    await tap(dialog(page).locator('.lang-btn[data-lang="vi"]'));
+    await dialog(page).locator('iframe[data-video=player]').waitFor();
+    const playerHead = await dialog(page).locator('.step-heading').first().innerText();
+    await page.keyboard.press('Escape');
+    await dialog(page).waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    await page.locator('.map-label[data-station=discharge]').evaluate((el) => el.click());
+    await dialog(page).waitFor({ timeout: 30000 });
+    const reHead = await dialog(page).locator('.step-heading').first().innerText();
+    const reFrames = await dialog(page).locator('iframe').count();
+    const reLangs = await dialog(page).locator('.lang-btn').count();
+    check(`13h [${w}px] 在播放器畫面關閉後重進：先回到語言選擇（五個按鈕、沒有播放器）`, playerHead === '出院照護影片' && reHead === '出院前，請選擇您想觀看的影片語言' && reFrames === 0 && reLangs === 5, `${playerHead} → ${reHead} frames=${reFrames} langs=${reLangs}`);
+    await page.keyboard.press('Escape');
+    await dialog(page).waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    // 從清單搜尋直接開啟 05 的照護重點：也先選語言，「繼續回覆示教」再接回那個重點
+    await page.click('#station-list-open');
+    await page.fill('#search-input', '個管師');
+    await page.locator('.search-results .station-row[data-station=discharge]').first().click();
+    await dialog(page).waitFor({ timeout: 30000 });
+    const sHead = await dialog(page).locator('.step-heading').first().innerText();
+    await tap(dialog(page).locator('[data-video=continue]'));
+    const sText = await dialog(page).innerText();
+    check(`13i [${w}px] 從搜尋開啟 05 的照護重點也先選語言，繼續後接回「聯絡方式」`, sHead === '出院前，請選擇您想觀看的影片語言' && sText.includes('聯絡方式') && sText.includes('練習這一題'), sHead);
     await ctx.close();
   }
 

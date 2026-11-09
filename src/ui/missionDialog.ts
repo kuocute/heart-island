@@ -61,7 +61,11 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   // 醫護人員進入住院區時，預設打開規範卡
   const defaultTab: Tab = role === 'staff' && station.staff && station.zone === 'hospital' ? 'staff' : 'practice';
   const card = station.card;
-  let step: Step = o.itemId ? { kind: 'item', itemId: o.itemId } : station.id === STATION_VIDEO.station ? { kind: 'video' } : card ? { kind: 'card' } : { kind: 'intro', tab: defaultTab };
+  // 05 出院碼頭：不論從地圖、清單、搜尋或照護連結進站，每次都先選語言看影片；
+  // 「繼續回覆示教」再接回原本要去的畫面（指定的照護重點，或衛教與練習／醫護規範）。
+  const hasVideo = station.id === STATION_VIDEO.station;
+  const afterVideo: Step = o.itemId ? { kind: 'item', itemId: o.itemId } : { kind: 'intro', tab: defaultTab };
+  let step: Step = hasVideo ? { kind: 'video' } : o.itemId ? { kind: 'item', itemId: o.itemId } : card ? { kind: 'card' } : { kind: 'intro', tab: defaultTab };
   const go = (s: Step) => { step = s; render(); };
   const missionIndex = (id?: string) => station.missions.findIndex((m) => m.id === id);
   const practiced = (m: Mission) => progress.station(station.id).practiced.includes(m.id);
@@ -179,7 +183,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   function renderVideo(s: Extract<Step, { kind: 'video' }>) {
     const V = STATION_VIDEO;
     const chosen = V.languages.find((l) => l.id === s.lang);
-    view.append(heading(V.title, 'video-title'));
+    view.append(heading(chosen ? V.playerTitle : V.title, 'video-title'));
     if (!chosen) {
       view.append(
         h('p', { class: 'video-prompt' }, V.prompt),
@@ -214,7 +218,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       announce(live, `已切換為${chosen.label}影片。`);
     }
     view.append(h('div', { class: 'actions' },
-      h('button', { type: 'button', class: 'btn btn-primary btn-block', 'data-video': 'continue', onclick: () => go({ kind: 'intro', tab: defaultTab }) }, V.continueLabel)));
+      h('button', { type: 'button', class: 'btn btn-primary btn-block', 'data-video': 'continue', onclick: () => go(afterVideo) }, V.continueLabel)));
   }
 
   /**

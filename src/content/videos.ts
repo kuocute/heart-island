@@ -8,13 +8,15 @@ export type VideoLanguage = { id: string; label: string; lang: string; url: stri
 export const STATION_VIDEO: {
   station: StationId;
   title: string;
+  playerTitle: string;
   prompt: string;
   continueLabel: string;
   languages: VideoLanguage[];
 } = {
   station: 'discharge',
-  title: '出院前，先看一段照護影片',
-  prompt: '請選擇影片語言，按下播放鍵開始觀看。看完或想先練習時，都可以按「繼續回覆示教」。',
+  title: '出院前，請選擇您想觀看的影片語言',
+  playerTitle: '出院照護影片',
+  prompt: '選好語言後，影片會出現在這個視窗，請按播放鍵開始觀看。看完或想先練習時，都可以按「繼續回覆示教」。',
   continueLabel: '繼續回覆示教',
   languages: [
     { id: 'zh', label: '中文', lang: 'zh-Hant', url: 'https://youtu.be/CVxv18oN3IE' },

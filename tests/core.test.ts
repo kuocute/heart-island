@@ -68,7 +68,7 @@ describe('05 出院碼頭照護影片', () => {
   it('五種語言、按鈕文字與 YouTube 網址正確', async () => {
     const { STATION_VIDEO, youtubeId, embedUrl } = await import('../src/content/videos');
     expect(STATION_VIDEO.station).toBe('discharge');
-    expect(STATION_VIDEO.title).toBe('出院前，先看一段照護影片');
+    expect(STATION_VIDEO.title).toBe('出院前，請選擇您想觀看的影片語言');
     expect(STATION_VIDEO.continueLabel).toBe('繼續回覆示教');
     expect(STATION_VIDEO.languages.map((l) => [l.label, l.url])).toEqual([
       ['中文', 'https://youtu.be/CVxv18oN3IE'],
