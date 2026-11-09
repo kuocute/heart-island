@@ -334,3 +334,14 @@ body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
 .welcome-close { flex: none; border: 0; background: transparent; }
 .map-label.beckon .map-label-no { box-shadow: 0 0 0 0 rgba(226, 112, 74, 0.7); animation: beckon 1.6s ease-out infinite; }
 @keyframes beckon { 0% { box-shadow: 0 0 0 0 rgba(226, 112, 74, 0.7); } 100% { box-shadow: 0 0 0 12px rgba(226, 112, 74, 0); } }
+
+/* ───── 醫護人員專區｜院內帳號登入 ───── */
+.portal-card { margin: 10px 0; padding: 10px 12px; border-radius: 14px; background: #eef3fb; border: 1px solid #c8d6ec; }
+.portal-card h4 { margin: 0 0 4px; font-size: 0.95rem; color: #2f5f9a; }
+.portal-card p { margin: 4px 0; }
+.portal-btn { width: 100%; gap: 6px; }
+.portal-card .btn-primary.portal-btn { background: #2f5f9a; }
+.portal-card .btn-primary.portal-btn:hover { background: #244b7a; }
+.portal-msg { font-weight: 700; color: #8a4b00; }
+.portal-msg:empty { display: none; }
+.portal-card.compact { margin: 8px 0 0; background: #fff; }

@@ -402,6 +402,66 @@ try {
     await ctx.close();
   }
 
+  // ───── 11. 醫護人員專區｜院內帳號登入（入口設在 01 入院評估花園；病友家屬免登入） ─────
+  {
+    // 11-1 預設建置：沒有設定入口網址
+    const { ctx, page } = await newPage({ viewport: { width: 390, height: 844 } });
+    await startAs(page, 'patient');
+    check('11a 病友不需登入即可進島遊玩', await page.locator('.map-label[data-station=admission]').isVisible());
+    await page.click('#station-list-open');
+    await page.locator('.station-row[data-station=admission]').click();
+    await dialog(page).waitFor();
+    const btn = dialog(page).locator('[data-portal]');
+    const label = (await btn.innerText()).replace(/\s+/g, '');
+    const kind = await btn.getAttribute('data-portal');
+    await btn.click();
+    await page.waitForTimeout(300);
+    const msg = await dialog(page).locator('.portal-msg').innerText();
+    check('11b 01 站有「醫護人員專區｜院內帳號登入」；未設定入口時顯示「尚未開放」', label.includes('醫護人員專區｜院內帳號登入') && kind === 'not-open' && msg === '院內規範入口尚未開放，請洽心衰照護團隊', msg);
+    const bodyLinks = await page.evaluate(() => [...document.querySelectorAll('a[href^="http"]')].map((a) => new URL(a.href).hostname));
+    check('11c 公開網頁沒有任何院內或外部文件連結', bodyLinks.every((h) => h === 'localhost'), bodyLinks.join(','));
+    await page.keyboard.press('Escape');
+    await ctx.close();
+  }
+  {
+    // 11-2 醫護人員角色：住院區規範卡也有同一個入口，不再出現公開的筆記本按鈕
+    const { ctx, page } = await newPage({ viewport: { width: 1280, height: 800 }, hasTouch: false });
+    await startAs(page, 'staff');
+    await page.click('#station-list-open');
+    await page.locator('.station-row[data-station=ward]').click();
+    await dialog(page).waitFor();
+    const staffTab = await page.locator('#tab-staff').getAttribute('aria-selected');
+    const portal = await dialog(page).locator('[data-portal]').count();
+    const nb = await dialog(page).getByText('開啟疾病認證筆記本').count();
+    check('11d 醫護角色：住院區規範卡顯示院內入口，沒有公開的筆記本按鈕', staffTab === 'true' && portal === 1 && nb === 0);
+    await ctx.close();
+  }
+  {
+    // 11-3 設定入口網址後的建置（範例網域，不是真實院內網址）
+    const PORTAL = 'https://intranet.example.org/hf/guidelines';
+    execSync('npx vite build --outDir dist-portal-test --emptyOutDir', { env: { ...process.env, VITE_STAFF_PORTAL_URL: PORTAL }, stdio: 'ignore' });
+    const okCheck = (() => { try { execSync('node scripts/check-bundle.mjs dist-portal-test', { env: { ...process.env, VITE_STAFF_PORTAL_URL: PORTAL }, stdio: 'ignore' }); return true; } catch { return false; } })();
+    let blocked = false;
+    try { execSync('npx vite build --outDir dist-bad-test --emptyOutDir', { env: { ...process.env, VITE_STAFF_PORTAL_URL: 'https://notebooklm.google.com/notebook/test' }, stdio: 'ignore' }); } catch { blocked = true; }
+    check('11e 入口網址可設定；NotebookLM 等不安全網址在建置時就被擋下', okCheck && blocked && !existsSync('dist-bad-test/index.html'));
+    const s3 = await startServer(8792, 'dist-portal-test');
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await ctx.newPage();
+    await page.goto('http://localhost:8792');
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, 'caregiver');
+    await page.click('#station-list-open');
+    await page.locator('.station-row[data-station=admission]').click();
+    await dialog(page).waitFor();
+    const a = dialog(page).locator('a[data-portal=open]');
+    const href = await a.getAttribute('href'), target = await a.getAttribute('target'), rel = await a.getAttribute('rel');
+    const notOpen = await dialog(page).getByText('院內規範入口尚未開放').count();
+    check('11f 已設定入口：點擊另開視窗前往院內入口（由院內平台驗證帳號），不顯示「尚未開放」', href === PORTAL && target === '_blank' && /noopener/.test(rel) && /noreferrer/.test(rel) && notOpen === 0, `${href} ${target} ${rel}`);
+    await ctx.close();
+    s3.kill();
+    execSync('rm -rf dist-portal-test dist-bad-test');
+  }
+
   // ───── 7. 未登入者無法取得院內工作卡連結或內部資料 ─────
   {
     execSync('npx vite build --outDir dist-staff-test --emptyOutDir', { env: { ...process.env, VITE_STAFF_API_BASE: '/staff/api' }, stdio: 'ignore' });

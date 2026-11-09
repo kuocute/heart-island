@@ -32,8 +32,13 @@ jobs:
         run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          # 醫護人員專區入口：在 GitHub 專案 Settings → Secrets and variables → Actions → Variables
+          # 新增 STAFF_PORTAL_URL（院方核准、需院內帳號登入的 SharePoint／內網入口）。未設定時顯示「尚未開放」。
+          VITE_STAFF_PORTAL_URL: ${{ vars.STAFF_PORTAL_URL }}
       - name: 確認發布檔案沒有院內連結
         run: npm run check:bundle
+        env:
+          VITE_STAFF_PORTAL_URL: ${{ vars.STAFF_PORTAL_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
