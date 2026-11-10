@@ -182,7 +182,7 @@ describe('醫護人員專區入口網址', () => {
 });
 
 import { SDM_CARD } from '../src/content/sdm';
-import { readFileSync } from 'node:fs';
+import sdmCardSrc from '../src/ui/sdmCard.ts?raw';
 
 describe('醫病共享決策（SDM）引導卡', () => {
   it('放在 14 進階心衰醫療港，文字與網址正確', () => {
@@ -198,7 +198,6 @@ describe('醫病共享決策（SDM）引導卡', () => {
     expect(SDM_CARD.url).toBe('https://apps.chimei.org.tw/sdm/survey_doit.aspx?X=c6zuS');
   });
   it('引導卡只提供入口，不會寫入任何進度', () => {
-    const src = readFileSync('src/ui/sdmCard.ts', 'utf8');
-    expect(src).not.toMatch(/progress|setPracticed|markExplored|localStorage/);
+    expect(sdmCardSrc).not.toMatch(/progress|setPracticed|markExplored|localStorage/);
   });
 });
