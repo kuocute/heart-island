@@ -402,6 +402,134 @@ try {
     await ctx.close();
   }
 
+  // ───── 13. 05 出院碼頭：先選語言看照護影片，再繼續回覆示教 ─────
+  for (const [w, hgt, touch] of [[390, 844, true], [1280, 800, false]]) {
+    const VIDEOS = [
+      ['中文', 'zh', 'https://youtu.be/CVxv18oN3IE', 'CVxv18oN3IE'],
+      ['한국어', 'ko', 'https://youtu.be/-uMzUK6rr74', '-uMzUK6rr74'],
+      ['Tiếng Việt', 'vi', 'https://youtu.be/egGDlRvgJEQ', 'egGDlRvgJEQ'],
+      ['English', 'en', 'https://youtu.be/-LxkYPScxt0', '-LxkYPScxt0'],
+      ['Bahasa Indonesia', 'id', 'https://youtu.be/vILaVEThvz0', 'vILaVEThvz0'],
+    ];
+    const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
+    // 測試環境不連外：攔截 YouTube，播放器與新分頁都回傳替身頁，只驗證網址與流程
+    const stub = (t) => (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<!doctype html><title>${t}</title><p>${t}</p>` });
+    // 播放器替身：收到 listening 後，照 YouTube enablejsapi 的格式回報 onReady 或 onError；同時記錄送出的 Referer
+    let playerError = 0;
+    const embedReqs = [];
+    const playerStub = async (route) => {
+      const hd = await route.request().allHeaders();
+      embedReqs.push({ url: route.request().url(), referer: hd.referer ?? '' });
+      const code = playerError;
+      await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: `<!doctype html><title>YouTube 播放器（測試替身）</title><p>播放器替身</p><script>addEventListener('message',function(e){try{var d=JSON.parse(e.data);if(d.event==='listening')parent.postMessage(JSON.stringify(${code} ? {event:'onError',info:${code}} : {event:'onReady'}),'*');}catch(x){}});</script>` });
+    };
+    await ctx.route('https://www.youtube.com/embed/**', playerStub);
+    await ctx.route('https://youtu.be/**', stub('YouTube（測試替身）'));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
+    await page.goto(BASE);
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, 'patient');
+    const tap = (loc) => (touch ? loc.tap() : loc.click());
+    await page.locator('.map-label[data-station=discharge]').evaluate((el) => el.click());
+    await dialog(page).waitFor({ timeout: 90000 });
+    const title = await dialog(page).locator('.step-heading').first().innerText();
+    const labels = await dialog(page).locator('.lang-btn').allInnerTexts();
+    const autoplayFree = (await dialog(page).locator('iframe').count()) === 0;
+    check(`13a [${w}px] 進站第一個畫面：「出院前，請選擇您想觀看的影片語言」與五個語言按鈕（尚未載入影片）`, title === '出院前，請選擇您想觀看的影片語言' && JSON.stringify(labels) === JSON.stringify(VIDEOS.map((v) => v[0])) && autoplayFree, labels.join('／'));
+    let allOk = true;
+    let detail = '';
+    for (const [label, id, url, vid] of VIDEOS) {
+      await tap(dialog(page).locator(`.lang-btn[data-lang="${id}"]`));
+      const frame = dialog(page).locator('iframe[data-video=player]');
+      await frame.waitFor();
+      const src = await frame.getAttribute('src');
+      const yt = dialog(page).locator('a[data-video=youtube]');
+      const href = await yt.getAttribute('href'), target = await yt.getAttribute('target'), rel = await yt.getAttribute('rel');
+      const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 20000 }), tap(yt)]);
+      await pop.waitForLoadState('domcontentloaded').catch(() => {});
+      const popUrl = pop.url();
+      await pop.close();
+      await page.bringToFront();
+      const current = await dialog(page).locator('.video-current').innerText();
+      await page.waitForFunction(() => document.querySelector('iframe[data-video=player]')?.dataset.state === 'ready', null, { timeout: 15000 }).catch(() => {});
+      const pstate = await frame.getAttribute('data-state');
+      const req = embedReqs.filter((r) => r.url.includes(`/embed/${vid}`)).pop();
+      const origin = new URL(BASE).origin;
+      const ok = src.startsWith(`https://www.youtube.com/embed/${vid}?`) && !/autoplay=1/.test(src) && new URL(src).searchParams.get('enablejsapi') === '1' && new URL(src).searchParams.get('origin') === origin
+        && pstate === 'ready' && (req?.referer ?? '').startsWith(origin) && (await frame.getAttribute('referrerpolicy')) === 'strict-origin-when-cross-origin' && href === url && target === '_blank' && /noopener/.test(rel) && /noreferrer/.test(rel) && popUrl === url && current.includes(label);
+      if (!ok) { allOk = false; detail += `${label}: ${src} state=${pstate} referer=${req?.referer} ${href} ${popUrl}；`; }
+      await tap(dialog(page).locator('[data-video=switch]'));
+      await dialog(page).locator('.lang-btn').first().waitFor();
+      const back = (await dialog(page).locator('iframe').count()) === 0 && (await page.evaluate((x) => document.activeElement?.getAttribute('data-lang') === x, id));
+      if (!back) { allOk = false; detail += `${label}: 切換語言失敗；`; }
+    }
+    check(`13b [${w}px] 五種語言：iframe 用 www.youtube.com/embed/影片ID、送出 Referer、播放器回報就緒、不自動播放；「在 YouTube 開啟」新分頁網址正確；「切換語言」回到語言選擇`, allOk, detail);
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.discharge ?? null);
+    check(`13c [${w}px] 選擇語言只切換影片，不寫入進度`, (before?.practiced ?? []).length === 0, JSON.stringify(before));
+    // 播放器回報錯誤碼時，站內顯示原因，按鈕仍可用
+    let errOk = true, errDetail = '';
+    for (const [code, want] of [[150, '擁有者不允許'], [101, '擁有者不允許'], [153, '網站來源資訊']]) {
+      playerError = code;
+      await tap(dialog(page).locator('.lang-btn[data-lang="zh"]'));
+      const st = dialog(page).locator('[data-video=status]');
+      await st.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      const txt = (await st.isVisible()) ? await st.innerText() : '';
+      if (!(txt.includes(want) && txt.includes(String(code)) && txt.includes('在 YouTube 開啟') && (await dialog(page).locator('a[data-video=youtube]').isVisible()))) { errOk = false; errDetail += `${code}: ${txt}；`; }
+      await tap(dialog(page).locator('[data-video=switch]'));
+    }
+    playerError = 0;
+    check(`13g [${w}px] 播放器回報錯誤 150／101／153 時，站內說明原因並保留「在 YouTube 開啟」`, errOk, errDetail);
+    // 選韓文後繼續回覆示教 → 原本出院碼頭的任務流程
+    await tap(dialog(page).locator('.lang-btn[data-lang="ko"]'));
+    await tap(dialog(page).locator('[data-video=continue]'));
+    const introText = await dialog(page).innerText();
+    check(`13d [${w}px] 「繼續回覆示教」接回原本的出院碼頭任務`, introText.includes('本站照護重點') && introText.includes('找出回診日期') && (await dialog(page).locator('iframe').count()) === 0);
+    await clickBtn(page, '開始任務');
+    await clickBtn(page, '下一步：做選擇');
+    await page.getByRole('button', { name: '回診安排', exact: true }).click();
+    const fb = await dialog(page).locator('.step-heading').innerText();
+    await clickBtn(page, '下一步：說一次或做一次');
+    const teach = await dialog(page).locator('.teach').innerText();
+    await clickBtn(page, '已練習');
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.discharge ?? null);
+    const state = await page.locator('.map-label[data-station=discharge]').getAttribute('data-state');
+    check(`13e [${w}px] 回覆示教流程照原本規則：完成 1 題記為已練習 1／3，站點尚未完成`, fb.includes('答對了') && teach.includes('回診') && after?.practiced?.length === 1 && state === 'explored', `${JSON.stringify(after)} ${state}`);
+    await page.keyboard.press('Escape');
+    // 再次進站仍先顯示影片，並可從任務頁回看影片
+    await page.locator('.map-label[data-station=discharge]').evaluate((el) => el.click());
+    await dialog(page).waitFor({ timeout: 30000 });
+    const again = await dialog(page).locator('.step-heading').first().innerText();
+    await tap(dialog(page).locator('[data-video=continue]'));
+    await tap(dialog(page).locator('[data-video=again]'));
+    const again2 = await dialog(page).locator('.step-heading').first().innerText();
+    check(`13f [${w}px] 再次進站先顯示影片；任務頁可「再看一次照護影片」`, again === '出院前，請選擇您想觀看的影片語言' && again2 === '出院前，請選擇您想觀看的影片語言');
+    // 停在播放器畫面時關閉，再從地圖進站：回到語言選擇，不保留上次的播放器
+    await tap(dialog(page).locator('.lang-btn[data-lang="vi"]'));
+    await dialog(page).locator('iframe[data-video=player]').waitFor();
+    const playerHead = await dialog(page).locator('.step-heading').first().innerText();
+    await page.keyboard.press('Escape');
+    await dialog(page).waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    await page.locator('.map-label[data-station=discharge]').evaluate((el) => el.click());
+    await dialog(page).waitFor({ timeout: 30000 });
+    const reHead = await dialog(page).locator('.step-heading').first().innerText();
+    const reFrames = await dialog(page).locator('iframe').count();
+    const reLangs = await dialog(page).locator('.lang-btn').count();
+    check(`13h [${w}px] 在播放器畫面關閉後重進：先回到語言選擇（五個按鈕、沒有播放器）`, playerHead === '出院照護影片' && reHead === '出院前，請選擇您想觀看的影片語言' && reFrames === 0 && reLangs === 5, `${playerHead} → ${reHead} frames=${reFrames} langs=${reLangs}`);
+    await page.keyboard.press('Escape');
+    await dialog(page).waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    // 從清單搜尋直接開啟 05 的照護重點：也先選語言，「繼續回覆示教」再接回那個重點
+    await page.click('#station-list-open');
+    await page.fill('#search-input', '個管師');
+    await page.locator('.search-results .station-row[data-station=discharge]').first().click();
+    await dialog(page).waitFor({ timeout: 30000 });
+    const sHead = await dialog(page).locator('.step-heading').first().innerText();
+    await tap(dialog(page).locator('[data-video=continue]'));
+    const sText = await dialog(page).innerText();
+    check(`13i [${w}px] 從搜尋開啟 05 的照護重點也先選語言，繼續後接回「聯絡方式」`, sHead === '出院前，請選擇您想觀看的影片語言' && sText.includes('聯絡方式') && sText.includes('練習這一題'), sHead);
+    await ctx.close();
+  }
+
   // ───── 11. 醫護人員專區｜院內帳號登入（入口設在 01 入院評估花園；病友家屬免登入） ─────
   {
     // 11-1 預設建置：沒有設定入口網址
@@ -504,6 +632,7 @@ try {
     await page.click('#start-btn');
     await page.locator('.map-label[data-station=discharge]').click();
     await dialog(page).waitFor({ timeout: 15000 });
+    await dialog(page).locator('[data-video=continue]').click(); // 出院碼頭先顯示照護影片
     await page.locator('#tab-staff').click();
     await page.waitForFunction(() => !document.querySelector('.staff-status')?.textContent.includes('讀取中'));
     const l2 = await dialog(page).locator('a[href*="notebooklm"]').count();

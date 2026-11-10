@@ -26,7 +26,8 @@ walk(dir);
 let bad = 0;
 for (const f of files) {
   if (bannedFiles.test(basename(f))) { console.error(`✗ ${f}：院內資料檔不應出現在部署檔案`); bad++; continue; }
-  const text = readFileSync(f, 'utf8');
+  // 院方提供、公開給病友觀看的 YouTube 衛教影片（見 src/content/videos.ts）不算未核准網址
+  const text = readFileSync(f, 'utf8').replace(/https:\/\/(youtu\.be|www\.youtube-nocookie\.com|www\.youtube\.com)\b/gi, '');
   for (const [re, what] of banned) if (re.test(text)) { console.error(`✗ ${f} 含有不應公開的內容：${what}`); bad++; }
   // 除了 w3.org 命名空間、程式庫網址與設定的醫護入口外，不應出現其他外部 https 網址
   for (const m of text.matchAll(/https:\/\/[a-z0-9.-]+/gi)) {

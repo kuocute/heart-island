@@ -2,6 +2,7 @@
 // 有衛教卡的站（返家照護站）：讀衛教卡 → 情境練習 → 看回饋與原因（答錯可重試）→ 答對即完成。
 // 一次只呈現目前一步；知識題正誤同時用文字表示；照護偏好題不計分、不儲存選項。
 import { CARE_LINKS } from '../content/links';
+import { EMBED_ORIGIN, STATION_VIDEO, embedUrl, playerErrorText, youtubeId } from '../content/videos';
 import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId } from '../content/types';
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
 import { announce, h, openModal, type ModalHandle } from './modal';
@@ -18,7 +19,9 @@ type Step =
   | { kind: 'choose'; i: number; tried: string[]; order: string[] }
   | { kind: 'feedback'; i: number; tried: string[]; choiceId?: string; order?: string[]; correct: boolean | null }
   | { kind: 'teach'; i: number }
-  | { kind: 'done' };
+  | { kind: 'done' }
+  /** 05 出院碼頭：先選語言看照護影片（lang 未選時顯示語言按鈕） */
+  | { kind: 'video'; lang?: string };
 
 const STEP_NAMES = ['看情境', '做選擇', '看回饋', '說一次或做一次'];
 const CARD_STEP_NAMES = ['讀衛教卡', '情境練習', '看回饋', '完成'];
@@ -58,7 +61,11 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   // 醫護人員進入住院區時，預設打開規範卡
   const defaultTab: Tab = role === 'staff' && station.staff && station.zone === 'hospital' ? 'staff' : 'practice';
   const card = station.card;
-  let step: Step = o.itemId ? { kind: 'item', itemId: o.itemId } : card ? { kind: 'card' } : { kind: 'intro', tab: defaultTab };
+  // 05 出院碼頭：不論從地圖、清單、搜尋或照護連結進站，每次都先選語言看影片；
+  // 「繼續回覆示教」再接回原本要去的畫面（指定的照護重點，或衛教與練習／醫護規範）。
+  const hasVideo = station.id === STATION_VIDEO.station;
+  const afterVideo: Step = o.itemId ? { kind: 'item', itemId: o.itemId } : { kind: 'intro', tab: defaultTab };
+  let step: Step = hasVideo ? { kind: 'video' } : o.itemId ? { kind: 'item', itemId: o.itemId } : card ? { kind: 'card' } : { kind: 'intro', tab: defaultTab };
   const go = (s: Step) => { step = s; render(); };
   const missionIndex = (id?: string) => station.missions.findIndex((m) => m.id === id);
   const practiced = (m: Mission) => progress.station(station.id).practiced.includes(m.id);
@@ -88,6 +95,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       case 'feedback': renderFeedback(step); break;
       case 'teach': renderTeach(step.i); break;
       case 'done': renderDone(); break;
+      case 'video': renderVideo(step); break;
     }
     const target = view.querySelector<HTMLElement>('.step-heading');
     if (target) requestAnimationFrame(() => target.focus());
@@ -163,8 +171,82 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
           h('span', { class: 'mission-pick-title' }, station.pickMission ? `進入：${m.title}` : `${i + 1}. ${m.title}`),
           h('span', { class: 'mission-pick-meta' }, kindLabel(m), practiced(m) ? ' · 已練習' : ''))))));
     if (!station.pickMission) panel.append(h('button', { type: 'button', class: 'btn btn-primary btn-block', onclick: () => startMission(0) }, card ? '打開衛教卡' : '開始任務'));
+    if (station.id === STATION_VIDEO.station) {
+      panel.append(h('button', { type: 'button', class: 'btn btn-secondary btn-block', 'data-video': 'again', onclick: () => go({ kind: 'video' }) }, '▶ 再看一次照護影片'));
+    }
     panel.append(linkList());
     view.append(panel);
+  }
+
+  // ───────── 05 出院碼頭：照護影片（選擇語言只切換影片，不寫入進度） ─────────
+  let refocusLang: string | null = null;
+  function renderVideo(s: Extract<Step, { kind: 'video' }>) {
+    const V = STATION_VIDEO;
+    const chosen = V.languages.find((l) => l.id === s.lang);
+    view.append(heading(chosen ? V.playerTitle : V.title, 'video-title'));
+    if (!chosen) {
+      view.append(
+        h('p', { class: 'video-prompt' }, V.prompt),
+        h('div', { class: 'lang-grid', role: 'group', 'aria-label': '選擇影片語言' }, ...V.languages.map((l) =>
+          h('button', { type: 'button', class: 'lang-btn', lang: l.lang, 'data-lang': l.id, onclick: () => go({ kind: 'video', lang: l.id }) }, l.label))),
+      );
+      if (refocusLang) {
+        const id = refocusLang;
+        refocusLang = null;
+        requestAnimationFrame(() => requestAnimationFrame(() => view.querySelector<HTMLElement>(`[data-lang="${id}"]`)?.focus()));
+      }
+    } else {
+      const vid = youtubeId(chosen.url);
+      view.append(h('p', { class: 'video-current' }, '影片語言：', h('strong', { lang: chosen.lang }, chosen.label)));
+      const status = h('p', { class: 'video-status', role: 'status', 'data-video': 'status', hidden: true });
+      if (vid) {
+        const frame = h('iframe', {
+          src: embedUrl(vid, location.origin), title: `出院照護影片（${chosen.label}）`,
+          allow: 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
+          allowfullscreen: true, referrerpolicy: 'strict-origin-when-cross-origin', 'data-video': 'player',
+        });
+        watchPlayer(frame, status);
+        view.append(h('div', { class: 'video-frame' }, frame));
+      }
+      view.append(status);
+      view.append(
+        h('div', { class: 'video-actions' },
+          h('button', { type: 'button', class: 'btn btn-secondary', 'data-video': 'switch', onclick: () => { refocusLang = chosen.id; go({ kind: 'video' }); } }, '切換語言'),
+          h('a', { class: 'btn btn-secondary', href: chosen.url, target: '_blank', rel: 'noopener noreferrer', 'data-video': 'youtube' }, '在 YouTube 開啟', h('span', { class: 'sr-only' }, '（另開新分頁）'))),
+        h('p', { class: 'small muted' }, '請按影片上的播放鍵開始觀看。影片無法播放時，請按「在 YouTube 開啟」。'),
+      );
+      announce(live, `已切換為${chosen.label}影片。`);
+    }
+    view.append(h('div', { class: 'actions' },
+      h('button', { type: 'button', class: 'btn btn-primary btn-block', 'data-video': 'continue', onclick: () => go(afterVideo) }, V.continueLabel)));
+  }
+
+  /**
+   * 聽 YouTube 播放器回報（enablejsapi）。錯誤碼 153／101／150 等會顯示在播放器下方；
+   * 若播放器一直沒有回應（例如被瀏覽器或網路阻擋），提示改用「在 YouTube 開啟」。
+   */
+  let stopWatching: (() => void) | null = null;
+  function watchPlayer(frame: HTMLIFrameElement, status: HTMLElement) {
+    stopWatching?.();
+    let ready = false;
+    const show = (text: string) => { status.textContent = text; status.hidden = false; frame.dataset.state = 'error'; };
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== EMBED_ORIGIN || e.source !== frame.contentWindow) return;
+      let d: { event?: string; info?: unknown };
+      try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+      if (!d || typeof d !== 'object') return;
+      if (d.event === 'onError') show(playerErrorText(Number(d.info)));
+      else if (d.event === 'onReady' || d.event === 'initialDelivery' || d.event === 'infoDelivery') {
+        if (!ready) { ready = true; frame.dataset.state = frame.dataset.state === 'error' ? 'error' : 'ready'; }
+      }
+    };
+    const hello = () => frame.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'hf-discharge-video', channel: 'widget' }), EMBED_ORIGIN);
+    frame.addEventListener('load', () => { hello(); setTimeout(hello, 400); });
+    const timer = window.setTimeout(() => { if (!ready && frame.isConnected && frame.dataset.state !== 'error') show('播放器沒有回應，可能被網路或瀏覽器阻擋。請按「在 YouTube 開啟」觀看。'); }, 12000);
+    window.addEventListener('message', onMsg);
+    stopWatching = () => { window.removeEventListener('message', onMsg); clearTimeout(timer); };
+    const mo = new MutationObserver(() => { if (!frame.isConnected) { stopWatching?.(); stopWatching = null; mo.disconnect(); } });
+    mo.observe(document.body, { childList: true, subtree: true });
   }
 
   // ───────── 照護重點 ─────────
