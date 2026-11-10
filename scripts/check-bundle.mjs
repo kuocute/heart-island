@@ -16,6 +16,10 @@ const banned = [
   [/scrypt\$/, '密碼雜湊'],
 ];
 const bannedFiles = /^(cards\.json|users\.json|access\.log)$/;
+// 院方核准、公開給病友使用的外部平台（由該平台處理填寫與資料，不含院內文件）
+const APPROVED_PUBLIC = [
+  'https://apps.chimei.org.tw', // 奇美醫院醫病共享決策（SDM）問卷，見 src/content/sdm.ts
+];
 let portalOrigin = null;
 if (process.env.VITE_STAFF_PORTAL_URL) {
   try { portalOrigin = new URL(process.env.VITE_STAFF_PORTAL_URL).origin.toLowerCase(); } catch { /* 交給建置檢查 */ }
@@ -32,6 +36,7 @@ for (const f of files) {
   // 除了 w3.org 命名空間、程式庫網址與設定的醫護入口外，不應出現其他外部 https 網址
   for (const m of text.matchAll(/https:\/\/[a-z0-9.-]+/gi)) {
     if (/w3\.org|phaser\.io|github\.com|localhost/.test(m[0])) continue;
+    if (APPROVED_PUBLIC.includes(m[0].toLowerCase())) continue;
     if (portalOrigin && m[0].toLowerCase() === portalOrigin) continue;
     console.error(`✗ ${f} 含未核准的外部網址（網域：${m[0].replace('https://', '')}）`);
     bad++;

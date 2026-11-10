@@ -357,3 +357,16 @@ body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
 .portal-msg { font-weight: 700; color: #8a4b00; }
 .portal-msg:empty { display: none; }
 .portal-card.compact { margin: 8px 0 0; background: #fff; }
+
+/* ───── 醫病共享決策（SDM）引導卡 ───── */
+.sdm-card { margin: 4px 0 14px; padding: 14px; border-radius: 16px; background: linear-gradient(135deg, #fff7f1, #fdeee6); border: 2px solid #f0b79a; }
+.sdm-title { margin: 0 0 6px; font-size: 1.08rem; color: #8a3a1a; }
+.sdm-text { margin: 0 0 10px; line-height: 1.65; }
+.sdm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sdm-actions .btn { flex: 1 1 200px; }
+.sdm-card .sdm-primary { background: #c8553d; }
+.sdm-card .sdm-primary:hover { background: #a8432e; }
+.sdm-card .sdm-secondary { border-color: #c8553d; color: #8a3a1a; }
+.sdm-note { margin: 8px 0 0; }
+.learn-anchor { scroll-margin-top: 8px; }
+.learn-anchor:focus { outline: 3px solid #1d4ed8; outline-offset: 2px; border-radius: 6px; }
