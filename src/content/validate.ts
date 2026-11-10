@@ -66,6 +66,16 @@ export function validateStations(stations: Station[], nodeIds?: Set<string>): st
         case 'reflection':
           if ('correctChoiceId' in raw || 'correctOrder' in raw) errors.push(`${mw}：反思題不可有正確答案`);
           break;
+        case 'team':
+          if (!ids.includes(m.bestChoiceId)) errors.push(`${mw}：bestChoiceId「${m.bestChoiceId}」不在選項中`);
+          if ('correctChoiceId' in raw || 'correctOrder' in raw) errors.push(`${mw}：團隊練習請用 bestChoiceId`);
+          if (!m.voices.length || m.voices.some((v) => !v.who.trim() || !v.text.trim())) errors.push(`${mw}：團隊練習需要情境對話`);
+          if (!m.explain.trim() || m.explainParts.length < 1) errors.push(`${mw}：團隊練習需要說明`);
+          if (m.helpers.length < 2 || m.helpers.some((x) => !x.role.trim() || !x.text.trim())) errors.push(`${mw}：團隊練習至少需要兩個協助角色`);
+          if (!m.practiceQuestions.length || !m.sentenceFrame.trim()) errors.push(`${mw}：團隊練習需要口頭練習問題與句型`);
+          if (m.nextStep.length < 1) errors.push(`${mw}：團隊練習需要「我的下一步」提示`);
+          if (s.card) errors.push(`${mw}：有衛教卡的站點不可放團隊練習`);
+          break;
         default:
           errors.push(`${mw}：未知的 interaction`);
       }

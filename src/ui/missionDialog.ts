@@ -3,7 +3,7 @@
 // 一次只呈現目前一步；知識題正誤同時用文字表示；照護偏好題不計分、不儲存選項。
 import { CARE_LINKS } from '../content/links';
 import { EMBED_ORIGIN, STATION_VIDEO, embedUrl, playerErrorText, youtubeId } from '../content/videos';
-import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId } from '../content/types';
+import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId, TeamMission } from '../content/types';
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
 import { announce, h, openModal, type ModalHandle } from './modal';
 import { renderStaffCard } from './staffCard';
@@ -21,12 +21,15 @@ type Step =
   | { kind: 'choose'; i: number; tried: string[]; order: string[] }
   | { kind: 'feedback'; i: number; tried: string[]; choiceId?: string; order?: string[]; correct: boolean | null }
   | { kind: 'teach'; i: number }
+  /** 團隊練習第二步：看團隊怎麼一起幫忙 */
+  | { kind: 'team-help'; i: number }
   | { kind: 'done' }
   /** 05 出院碼頭：先選語言看照護影片（lang 未選時顯示語言按鈕） */
   | { kind: 'video'; lang?: string };
 
 const STEP_NAMES = ['看情境', '做選擇', '看回饋', '說一次或做一次'];
 const CARD_STEP_NAMES = ['讀衛教卡', '情境練習', '看回饋', '完成'];
+const TEAM_STEP_NAMES = ['把問題說清楚', '看團隊怎麼幫忙', '用自己的話說一次'];
 export const REVIEW_TEXT = '虛構內容・待照護團隊審閱';
 export const ROLE_TEXT: Record<Role, string> = { patient: '病友', caregiver: '家屬', staff: '醫護人員' };
 
@@ -79,7 +82,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
     return h('div', { class: 'stepper' },
       h('p', { class: 'stepper-title' }, station.missions.length > 1 ? `任務 ${i + 1}／${station.missions.length}：${m.title}` : m.title),
       h('ol', { class: 'steps', 'aria-label': '任務步驟' },
-        ...(card ? CARD_STEP_NAMES : STEP_NAMES).map((n, k) => h('li', { class: k === active ? 'on' : k < active ? 'past' : '', 'aria-current': k === active ? 'step' : undefined }, n))),
+        ...(m.interaction === 'team' ? TEAM_STEP_NAMES : card ? CARD_STEP_NAMES : STEP_NAMES).map((n, k) => h('li', { class: k === active ? 'on' : k < active ? 'past' : '', 'aria-current': k === active ? 'step' : undefined }, n))),
     );
   }
   const heading = (text: string, cls = '') => h('h3', { class: `step-heading ${cls}`, tabindex: '-1' }, text);
@@ -96,6 +99,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       case 'choose': renderChoose(step); break;
       case 'feedback': renderFeedback(step); break;
       case 'teach': renderTeach(step.i); break;
+      case 'team-help': renderTeamHelp(step.i); break;
       case 'done': renderDone(); break;
       case 'video': renderVideo(step); break;
     }
@@ -301,6 +305,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   // ───────── 看情境 ─────────
   function renderScenario(i: number) {
     const m = station.missions[i];
+    if (m.interaction === 'team') { renderChoose({ kind: 'choose', i, tried: [], order: [] }); return; }
     view.append(stepper(0, m, i), heading('情境'), h('p', { class: 'scenario' }, m.scenario));
     if (m.prop) view.append(renderProp(m.prop));
     view.append(h('div', { class: 'actions' },
@@ -310,6 +315,21 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   // ───────── 做選擇 ─────────
   function renderChoose(s: Extract<Step, { kind: 'choose' }>) {
     const m = station.missions[s.i];
+    if (m.interaction === 'team') {
+      view.dataset.step = 'team-say';
+      view.append(stepper(0, m, s.i), teamScenario(m), heading(m.question),
+        h('div', { class: 'choices', role: 'group', 'aria-label': '選項' }, ...m.choices.map((c) => {
+          const tried = s.tried.includes(c.id);
+          return h('button', {
+            type: 'button', class: `choice ${tried ? 'tried' : ''}`, 'data-choice': c.id,
+            onclick: () => {
+              const best = c.id === m.bestChoiceId;
+              go({ kind: 'feedback', i: s.i, tried: best ? s.tried : [...s.tried, c.id], choiceId: c.id, correct: best });
+            },
+          }, c.label, tried ? h('span', { class: 'sr-only' }, '（已試過）') : null);
+        })));
+      return;
+    }
     if (card) view.append(reviewTag(), stepper(1, m, s.i), h('h3', { class: 'step-heading', tabindex: '-1' }, '情境'), h('p', { class: 'scenario' }, m.scenario), h('p', { class: 'pick-prompt' }, m.question));
     else view.append(stepper(1, m, s.i), heading(m.question));
     if (m.prop && m.prop.kind === 'sheet') view.append(renderProp(m.prop, true));
@@ -349,6 +369,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   // ───────── 看回饋 ─────────
   function renderFeedback(s: Extract<Step, { kind: 'feedback' }>) {
     const m = station.missions[s.i];
+    if (m.interaction === 'team') { renderTeamFeedback(m, s); return; }
     view.append(stepper(2, m, s.i));
     const next = h('button', { type: 'button', class: 'btn btn-primary', onclick: () => go({ kind: 'teach', i: s.i }) }, '下一步：說一次或做一次');
 
@@ -409,6 +430,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       const last = i === station.missions.length - 1 || station.pickMission;
       go(last ? { kind: 'done' } : { kind: 'scenario', i: i + 1 });
     };
+    if (m.interaction === 'team') { renderTeamTeach(m, i, done, after); return; }
     const learner = (r: LearnerRole) => h('p', { class: 'teach' }, m.teachBack[r]);
     view.append(stepper(3, m, i), heading(role === 'caregiver' ? '家屬練習：說一次或做一次' : role === 'staff' ? '請病友與家屬說一次或做一次' : '說一次或做一次'));
     if (role === 'staff') {
@@ -420,6 +442,64 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       h('div', { class: 'actions' },
         h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => { progress.setPracticed(station.id, m.id, false); announce(live, '已標記為稍後再練。'); after(); } }, '稍後再練'),
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => { progress.setPracticed(station.id, m.id, true); announce(live, '已標記為已練習。'); after(); } }, '已練習')));
+  }
+
+  // ───────── 團隊練習（03 跨團隊照護站）：把問題說清楚 → 看團隊怎麼幫忙 → 用自己的話說一次 ─────────
+  function teamScenario(m: TeamMission) {
+    return h('section', { class: 'team-scenario', 'aria-label': '情境' },
+      h('p', { class: 'pill' }, '虛構情境・不需輸入真實用藥或個人資料'),
+      h('h4', { class: 'team-scenario-title' }, `情境｜${m.scenario}`),
+      h('ul', { class: 'voices' }, ...m.voices.map((v) => h('li', { class: 'voice' },
+        h('span', { class: 'voice-who' }, `${v.who}說`), h('span', { class: 'voice-text' }, `「${v.text}」`)))));
+  }
+
+  function renderTeamFeedback(m: TeamMission, s: Extract<Step, { kind: 'feedback' }>) {
+    view.dataset.step = 'team-feedback';
+    const ok = !!s.correct;
+    const c = m.choices.find((x) => x.id === s.choiceId)!;
+    const retry = () => go({ kind: 'choose', i: s.i, tried: ok ? [] : s.tried, order: [] });
+    view.append(stepper(0, m, s.i),
+      heading(ok ? '✓ 說得很清楚' : '再想想怎麼說', ok ? 'ok' : 'retry'),
+      h('p', {}, '你選擇的是：', h('strong', {}, c.label)),
+      h('p', { class: `feedback ${ok ? 'ok' : 'retry'}` }, h('strong', {}, ok ? '很好。' : '提示：'), c.feedback),
+      h('div', { class: 'feedback neutral team-explain' },
+        h('p', {}, m.explain),
+        // 三要素拆解只在選到清楚的說法後顯示，避免重選前先看到答案
+        ok ? h('dl', { class: 'explain-parts' }, ...m.explainParts.flatMap((p) => [h('dt', {}, p.label), h('dd', {}, p.text)])) : ''),
+      h('div', { class: 'actions' },
+        ok ? h('button', { type: 'button', class: 'btn btn-secondary', 'data-action': 'reselect', onclick: retry }, '重新選擇') : '',
+        ok
+          ? h('button', { type: 'button', class: 'btn btn-primary', 'data-action': 'team-next', onclick: () => go({ kind: 'team-help', i: s.i }) }, '下一步：看團隊怎麼幫忙')
+          : h('button', { type: 'button', class: 'btn btn-primary', 'data-action': 'reselect', onclick: retry }, '重新選擇')));
+    announce(live, ok ? '說得很清楚。' : '請看提示後重新選擇。');
+  }
+
+  function renderTeamHelp(i: number) {
+    const m = station.missions[i] as TeamMission;
+    view.dataset.step = 'team-help';
+    view.append(stepper(1, m, i), heading('同一個問題，大家一起幫忙'),
+      h('p', { class: 'small muted' }, `情境｜${m.scenario}`),
+      h('ul', { class: 'stage-cards team-cards' }, ...m.helpers.map((x) => h('li', {}, h('h4', {}, x.role), h('p', {}, x.text)))),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn btn-primary', 'data-action': 'team-next', onclick: () => go({ kind: 'teach', i }) }, '下一步：用自己的話說一次')));
+  }
+
+  function renderTeamTeach(m: TeamMission, i: number, done: boolean, after: () => void) {
+    view.dataset.step = 'team-teach';
+    const who = role === 'caregiver' ? '請和病人輪流說一次，也可以說給醫護人員聽。' : role === 'staff' ? '請病友與家屬對彼此說一次，或說給你聽。' : '請對家人或醫護人員說一次。';
+    view.append(stepper(2, m, i), heading('用自己的話說一次'),
+      h('p', {}, who),
+      h('ol', { class: 'teach team-questions' }, ...m.practiceQuestions.map((q) => h('li', {}, q))),
+      h('p', { class: 'sentence-frame' }, h('span', { class: 'small muted' }, '可以這樣說：'), h('strong', {}, m.sentenceFrame)),
+      h('figure', { class: 'talk-card next-step-card' },
+        h('figcaption', {}, '我的下一步'),
+        h('dl', {}, ...m.nextStep.flatMap((x) => [h('dt', {}, `${x.label}：＿＿＿＿＿＿`), h('dd', { class: 'small muted' }, x.hint)])),
+        h('p', { class: 'small muted' }, '用說的就好，不需要輸入真實用藥或個人資料。這張卡只顯示在畫面上，不會被儲存。')),
+      h('p', { class: 'small muted' }, '「我練習好了」由使用者自己按，只記錄在這台裝置上，不代表醫療人員已確認示教能力。'),
+      done ? h('p', { class: 'pill ok' }, '這個任務之前已標記為「已練習」') : '',
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => { progress.setPracticed(station.id, m.id, false); announce(live, '已標記為稍後再練。'); after(); } }, '稍後再練'),
+        h('button', { type: 'button', class: 'btn btn-primary', 'data-action': 'practiced', onclick: () => { progress.setPracticed(station.id, m.id, true); announce(live, '已標記為已練習。'); after(); } }, '我練習好了')));
   }
 
   // ───────── 完成 ─────────
@@ -435,6 +515,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       station.pickMission && n < ids.length ? h('button', { type: 'button', class: 'btn btn-secondary btn-block', onclick: () => go({ kind: 'intro', tab: 'practice' }) }, '參觀另一個展館') : '',
       next ? h('button', { type: 'button', class: 'btn btn-secondary btn-block', onclick: () => { modal.close(); o.onGoStation?.(next.id); } }, `下一站：${next.no} ${next.title}`) : '',
       linkList(),
+      h('button', { type: 'button', class: 'btn btn-secondary btn-block', 'data-action': 'back-to-station', onclick: () => go({ kind: 'intro', tab: 'practice' }) }, '回到本站'),
       h('div', { class: 'actions' },
         h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => { modal.close(); o.onOpenList?.(); } }, '站點清單'),
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => modal.close() }, '回到島圖')));
@@ -445,7 +526,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
 }
 
 function kindLabel(m: Mission) {
-  return m.interaction === 'quiz' ? '知識題' : m.interaction === 'sequence' ? '排序題' : '照護偏好・不計分';
+  return m.interaction === 'quiz' ? '知識題' : m.interaction === 'sequence' ? '排序題' : m.interaction === 'team' ? '團隊練習' : '照護偏好・不計分';
 }
 
 function renderProp(p: Prop, compact = false): HTMLElement {

@@ -146,6 +146,23 @@ button, input { font: inherit; color: inherit; }
 .talk-card { margin: 14px 0; padding: 16px; border-radius: 16px; background: #fff7f1; border: 2px solid #f0b79a; }
 .talk-card figcaption { font-weight: 800; color: #b4542f; }
 .talk-card-main { font-size: 1.15rem; font-weight: 700; margin: 6px 0; }
+.team-scenario { margin: 8px 0 4px; }
+.team-scenario-title { margin: 6px 0; }
+.voices { list-style: none; padding: 0; margin: 0 0 6px; display: grid; gap: 8px; }
+.voice { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; line-height: 1.55; }
+.voice-who { display: block; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+.team-explain p { margin: 0 0 6px; }
+.explain-parts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; margin: 0; }
+.explain-parts dt { font-weight: 700; }
+.explain-parts dd { margin: 0; }
+.team-cards li { border-left-color: var(--teal); }
+.team-questions { padding-left: 32px; }
+.team-questions li + li { margin-top: 6px; }
+.sentence-frame { display: grid; gap: 2px; margin: 12px 0; padding: 10px 14px; border-radius: 12px; background: #eef3fb; }
+.next-step-card dl { margin: 6px 0; }
+.next-step-card dt { font-weight: 700; margin-top: 6px; }
+.next-step-card dd { margin: 0 0 2px; }
+@media (max-width: 480px) { .explain-parts { grid-template-columns: 1fr; } .explain-parts dd { margin-bottom: 4px; } }
 
 /* 道具 */
 .prop-sheet { margin: 10px 0; background: #fff; border: 1px solid #d8d1c0; border-radius: 12px; padding: 10px 12px; box-shadow: 0 2px 0 #e8e1d0; }

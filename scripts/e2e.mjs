@@ -530,6 +530,97 @@ try {
     await ctx.close();
   }
 
+  // ───── 14. 03 跨團隊照護站：和照護團隊一起想辦法（說清楚 → 團隊分工 → 用自己的話說一次） ─────
+  for (const [w, hgt, touch, roleName] of [[390, 844, true, 'patient'], [1280, 800, false, 'caregiver']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
+    await page.goto(BASE);
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, roleName);
+    const tap = (loc) => (touch ? loc.tap() : loc.click());
+    const d = dialog(page);
+    const primaries = async () => d.locator('.mission-view .btn-primary:visible').count();
+    // 從地圖點 03（點地標，角色走過去後開站）
+    await page.locator('.map-label[data-station=team]').evaluate((el) => el.click());
+    await d.waitFor({ timeout: 90000 });
+    const intro = await d.innerText();
+    const missions = await d.locator('.mission-pick-title').allInnerTexts();
+    check(`14a [${w}px] 從地圖進入 03：保留原有四個團隊窗口與「這件事要問誰」，下方新增「和照護團隊一起想辦法」`,
+      ['藥師窗口', '營養師窗口', '復健窗口', '社工窗口'].every((t) => intro.includes(t)) && JSON.stringify(missions) === JSON.stringify(['1. 這件事要問誰', '2. 和照護團隊一起想辦法']), missions.join('／'));
+    // 第一步：把問題說清楚
+    await tap(d.locator('.mission-pick').nth(1));
+    await d.locator('[data-choice=vague]').waitFor();
+    const s1 = await d.innerText();
+    const s1ok = s1.includes('情境｜回家後，我怕把藥吃錯') && s1.includes('我白天一個人在家，藥袋又很多') && s1.includes('我下班後可以幫忙確認') && s1.includes('你會怎麼向照護團隊開口？')
+      && (await d.locator('.steps li[aria-current=step]').innerText()) === '把問題說清楚' && (await primaries()) === 0;
+    check(`14b [${w}px] 第一步：虛構情境、病人與家屬的話、三個說法（只有選項一個主要動作）`, s1ok);
+    // 選「我有點擔心」→ 提示 → 重新選擇；再選「等回家遇到問題再說」→ 提示 → 重新選擇
+    let retryOk = true, detail = '';
+    for (const id of ['vague', 'later']) {
+      await tap(d.locator(`[data-choice=${id}]`));
+      const fb = await d.innerText();
+      const n = await primaries();
+      const parts = await d.locator('.explain-parts').count();
+      if (!(fb.includes('再想想怎麼說') && fb.includes('提示：') && fb.includes('交代遇到什麼困難、什麼時候會發生、希望得到什麼協助') && parts === 0 && n === 1)) { retryOk = false; detail += `${id}: primaries=${n} parts=${parts}；`; }
+      await tap(d.locator('[data-action=reselect]'));
+      await d.locator(`[data-choice=${id}]`).waitFor();
+      if (!(await d.locator(`[data-choice=${id}].tried`).count())) { retryOk = false; detail += `${id} 沒有標示已試過；`; }
+    }
+    check(`14c [${w}px] 選「我有點擔心」「等回家再說」：看到提示與說清楚的方法（不先揭露答案），可以重新選擇`, retryOk, detail);
+    await tap(d.locator('[data-choice=clear]'));
+    const okText = await d.innerText();
+    const okPrim = await primaries();
+    // 答對後也可以重新選擇
+    await tap(d.locator('[data-action=reselect]'));
+    const backToChoices = await d.locator('[data-choice=clear]').count();
+    await tap(d.locator('[data-choice=clear]'));
+    check(`14d [${w}px] 選清楚的說法：拆解困難、時間與希望的協助；可再重新選擇`, okText.includes('說得很清楚') && okText.includes('團隊就比較容易一起想辦法') && okText.includes('白天一個人在家的時候') && okText.includes('請團隊陪我一起確認') && okPrim === 1 && backToChoices === 1);
+    // 第二步：看團隊怎麼一起幫忙
+    await tap(d.locator('[data-action=team-next]'));
+    await d.locator('.team-cards').waitFor();
+    const cards = await d.locator('.team-cards h4').allInnerTexts();
+    const helpText = await d.locator('.team-cards').innerText();
+    check(`14e [${w}px] 第二步：藥師、個管師、家屬三張卡片（一個主要按鈕）`, JSON.stringify(cards) === JSON.stringify(['藥師', '個管師', '家屬']) && helpText.includes('核對藥袋') && helpText.includes('做得到的安排') && helpText.includes('能幫忙的時間') && (await primaries()) === 1, cards.join('／'));
+    // 第三步：用自己的話說一次
+    await tap(d.locator('[data-action=team-next]'));
+    await d.locator('.next-step-card').waitFor();
+    const t3 = await d.innerText();
+    const inputs = await d.locator('input, textarea, select').count();
+    check(`14f [${w}px] 第三步：兩個口頭問題、句型、「我的下一步」小卡，不需輸入任何資料`,
+      t3.includes('回家後，你會怎麼確認要吃哪包藥？') && t3.includes('如果還是不確定，你會怎麼求助？') && t3.includes('我會先＿＿＿。如果還是不確定，我會找＿＿＿幫忙。')
+      && t3.includes('我的下一步') && t3.includes('我會做什麼') && t3.includes('誰能協助') && t3.includes('何時再確認') && inputs === 0 && (await primaries()) === 1);
+    const beforeP = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.team?.practiced ?? []);
+    await tap(d.getByRole('button', { name: '我練習好了', exact: true }));
+    await d.locator('[data-action=back-to-station]').waitFor();
+    const afterP = await page.evaluate(() => JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.team?.practiced ?? []);
+    const doneText = await d.innerText();
+    const state = await page.locator('.map-label[data-station=team]').getAttribute('data-state');
+    check(`14g [${w}px] 按「我練習好了」：記為已練習 1／2，站點進度照原規則（另一題未練習，所以尚未完成）`,
+      beforeP.length === 0 && JSON.stringify(afterP) === '["team-together"]' && doneText.includes('已練習 1／2') && state === 'explored', `${JSON.stringify(afterP)} ${state}`);
+    // 返回站點
+    await tap(d.locator('[data-action=back-to-station]'));
+    const metas = await d.locator('.mission-pick-meta').allInnerTexts();
+    check(`14h [${w}px] 返回站點：第二個任務顯示「已練習」，第一個任務維持原樣`, metas[1]?.includes('已練習') && !metas[0]?.includes('已練習'), metas.join('／'));
+    // 原有任務 1 做完後接著進入新任務的第一步；兩題都練習後站點完成
+    await tap(d.locator('.mission-pick').nth(0));
+    await clickBtn(page, '下一步：做選擇');
+    await page.getByRole('button', { name: '營養師', exact: true }).click();
+    await clickBtn(page, '下一步：說一次或做一次');
+    await clickBtn(page, '已練習');
+    await d.locator('[data-choice=clear]').waitFor({ timeout: 10000 });
+    const chain = (await d.locator('.steps li[aria-current=step]').innerText()) === '把問題說清楚';
+    await page.keyboard.press('Escape');
+    await d.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+    const state2 = await page.locator('.map-label[data-station=team]').getAttribute('data-state');
+    check(`14i [${w}px] 原有「這件事要問誰」流程不變，做完接到新任務；兩題都練習後 03 完成`, chain && state2 === 'practiced', `${chain} ${state2}`);
+    // 05 出院碼頭仍先顯示影片語言選擇
+    await page.locator('.map-label[data-station=discharge]').evaluate((el) => el.click());
+    await d.waitFor({ timeout: 90000 });
+    check(`14j [${w}px] 05 出院碼頭不受影響：仍先顯示影片語言選擇`, (await d.locator('.step-heading').first().innerText()) === '出院前，請選擇您想觀看的影片語言');
+    await ctx.close();
+  }
+
   // ───── 11. 醫護人員專區｜院內帳號登入（入口設在 01 入院評估花園；病友家屬免登入） ─────
   {
     // 11-1 預設建置：沒有設定入口網址
