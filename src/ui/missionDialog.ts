@@ -10,6 +10,8 @@ import { renderStaffCard } from './staffCard';
 import { renderPortalEntry } from './portalEntry';
 import { renderSdmCard } from './sdmCard';
 import { SDM_CARD } from '../content/sdm';
+import { EATING_OUT } from '../content/eatingOut';
+import { renderEatingOut } from './eatingOut';
 import { PORTAL_STATION } from '../staff/portal';
 
 type Tab = 'practice' | 'staff';
@@ -271,6 +273,16 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
   function renderItem(itemId: string) {
     const it = station.items.find((x) => x.id === itemId) as Item | undefined;
     if (!it) { go({ kind: 'intro', tab: 'practice' }); return; }
+    // 08 低鹽餐桌：「今天外食，怎麼點？」展開成四個外食情境的互動練習
+    if (station.id === EATING_OUT.station && it.id === EATING_OUT.itemId) {
+      const box = h('div', { class: 'eatout' });
+      view.append(box);
+      renderEatingOut({
+        container: box, live, notice: station.notice,
+        onBackToTable: (done) => { go({ kind: 'intro', tab: 'practice' }); if (done) announce(live, '練習好了，回到低鹽餐桌。'); },
+      });
+      return;
+    }
     const mi = missionIndex(it.missionId);
     view.append(
       h('p', { class: `zone-chip ${station.zone}` }, `本站照護重點 ${station.items.indexOf(it) + 1}／${station.items.length}`),
