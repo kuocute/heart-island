@@ -86,7 +86,32 @@ export type ReflectionMission = MissionBase & {
   conversationCard?: string;
 };
 
-export type Mission = QuizMission | SequenceMission | ReflectionMission;
+/**
+ * 團隊練習（03 跨團隊照護站）：①把問題說清楚 → ②看團隊怎麼一起幫忙 → ③用自己的話說一次。
+ * 第一步有「最能讓團隊一起想辦法」的說法；選其他選項會看到提示，可重新選擇。全程虛構情境，不輸入真實用藥或個人資料。
+ */
+export type TeamMission = MissionBase & {
+  interaction: 'team';
+  /** 情境中的對話（虛構） */
+  voices: { who: string; text: string }[];
+  choices: Choice[];
+  /** 最能讓團隊一起想辦法的說法 */
+  bestChoiceId: string;
+  /** 選完後的共同說明 */
+  explain: string;
+  /** 說清楚的三個要素（遇到什麼困難、什麼時候發生、希望得到什麼協助） */
+  explainParts: { label: string; text: string }[];
+  /** 第二步：同一個問題由不同角色一起處理（建議 3 張） */
+  helpers: { role: string; text: string }[];
+  /** 第三步：口頭回覆示教問題 */
+  practiceQuestions: string[];
+  /** 第三步：句型 */
+  sentenceFrame: string;
+  /** 「我的下一步」小卡：每列一個提示 */
+  nextStep: { label: string; hint: string }[];
+};
+
+export type Mission = QuizMission | SequenceMission | ReflectionMission | TeamMission;
 
 /** 島上的小建築：本站的照護重點細項。點開看說明，可連到練習任務。 */
 export type Item = {
