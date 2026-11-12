@@ -64,6 +64,35 @@ describe('衛教內容驗證', () => {
   });
 });
 
+describe('03 跨團隊照護站：和照護團隊一起想辦法', () => {
+  it('保留原有任務，新增團隊練習；三步內容完整，全程虛構', () => {
+    const team = STATIONS.find((s) => s.id === 'team')!;
+    expect(team.missions.map((m) => m.id)).toEqual(['team-who', 'team-together']);
+    const m = team.missions[1];
+    expect(m.interaction).toBe('team');
+    if (m.interaction !== 'team') return;
+    expect(m.title).toBe('和照護團隊一起想辦法');
+    expect(m.question).toBe('你會怎麼向照護團隊開口？');
+    expect(m.choices).toHaveLength(3);
+    expect(m.choices.find((c) => c.id === m.bestChoiceId)?.label).toContain('能不能請你陪我確認');
+    expect(m.explainParts.map((p) => p.label)).toEqual(['遇到什麼困難', '什麼時候會發生', '希望得到什麼協助']);
+    expect(m.helpers.map((x) => x.role)).toEqual(['藥師', '個管師', '家屬']);
+    expect(m.practiceQuestions).toEqual(['回家後，你會怎麼確認要吃哪包藥？', '如果還是不確定，你會怎麼求助？']);
+    expect(m.sentenceFrame).toBe('我會先＿＿＿。如果還是不確定，我會找＿＿＿幫忙。');
+    expect(m.nextStep.map((x) => x.label)).toEqual(['我會做什麼', '誰能協助', '何時再確認']);
+  });
+  it('團隊練習的 bestChoiceId 必須在選項中', () => {
+    const bad = structuredClone(STATIONS);
+    const m = bad.find((s) => s.id === 'team')!.missions[1] as { bestChoiceId: string };
+    m.bestChoiceId = 'nope';
+    expect(validateStations(bad).join('\n')).toContain('bestChoiceId');
+  });
+  it('05 出院碼頭仍負責出院資料、回診日期與聯絡方式', () => {
+    const d = STATIONS.find((s) => s.id === 'discharge')!;
+    expect(d.items.map((i) => i.id)).toEqual(['followup-date', 'contact', 'my-plan']);
+  });
+});
+
 describe('05 出院碼頭照護影片', () => {
   it('五種語言、按鈕文字與 YouTube 網址正確', async () => {
     const { STATION_VIDEO, youtubeId, embedUrl } = await import('../src/content/videos');
