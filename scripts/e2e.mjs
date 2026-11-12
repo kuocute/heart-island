@@ -633,6 +633,90 @@ try {
     await ctx.close();
   }
 
+  // ───── 15. 08 低鹽餐桌：今天外食，怎麼點？（四個情境 → 我會怎麼做 → 回饋 → 口頭練習 → 回到餐桌） ─────
+  for (const [w, hgt, touch, roleName] of [[390, 844, true, 'caregiver'], [1280, 800, false, 'patient']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
+    await page.goto(BASE);
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, roleName);
+    const tap = (loc) => (touch ? loc.tap() : loc.click());
+    const d = dialog(page);
+    const box = d.locator('.eatout');
+    const progressNow = () => page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.diet ?? null));
+    // 從地圖點 08
+    await page.locator('.map-label[data-station=diet]').evaluate((el) => el.click());
+    await d.waitFor({ timeout: 90000 });
+    const notice = await d.locator('.notice').first().innerText();
+    const progress0 = await progressNow();
+    await tap(d.locator('.item-card[data-item=eat-out]'));
+    await box.waitFor();
+    const scenesShown = await box.locator('.eatout-btn').allInnerTexts();
+    const menuNotice = await box.locator('[data-eatout=notice]').innerText();
+    check(`15a [${w}px] 從地圖進 08，點「今天外食，怎麼點？」顯示四個情境按鈕與本頁原有限鹽、水分提醒`,
+      (await box.locator('.step-heading').innerText()) === '今天外食，怎麼點？' && scenesShown.map((t) => t.replace(/\s+/g, '')).join('|').replace(/[🍱🍜🍲🏪]/gu, '') === '便當／自助餐|麵店／小吃攤|火鍋|超商' && menuNotice === notice && notice.includes('依醫囑與營養師說明'), scenesShown.join('／'));
+
+    // 依序作答：先選一個錯的看提示 → 再選一次 → 選對 → 看說明與對店家說的話／技巧
+    const plan = [
+      { scene: 'bento', qs: [['gravy', 'plain', 'say', '白飯不要淋滷汁'], ['accept', 'ask', 'say', '有沒有調味比較少的主菜']] },
+      { scene: 'noodle', qs: [['finish', 'less', 'say', '肉燥和醬油膏少一點'], ['no-soup', 'less-sauce', 'say', '拌醬少一點']] },
+      { scene: 'hotpot', qs: [['processed', 'fresh', 'say', '清湯鍋底'], ['drink', 'light', 'tip', '小碟子']] },
+      { scene: 'store', qs: [['A', 'B', 'tip', '每份鈉含量 × 包裝份數']] },
+    ];
+    let allOk = true, detail = '';
+    for (const p of plan) {
+      await tap(box.locator(`.eatout-btn[data-scene=${p.scene}]`));
+      for (const [k, [wrong, right, kind, phrase]] of p.qs.entries()) {
+        await box.locator(`[data-choice=${wrong}]`).waitFor();
+        const qText = await box.innerText();
+        if (p.scene === 'store') {
+          const labelsOk = (await box.locator('.demo-label').count()) === 2 && (await box.locator('.demo-badge').allInnerTexts()).every((t) => t.includes('示範用')) && (await box.locator('[data-calc]').count()) === 0;
+          if (!labelsOk) { allOk = false; detail += 'store 標示；'; }
+        }
+        if (k === 1 && p.scene === 'bento' && !qText.includes('沒辦法少鹽')) { allOk = false; detail += 'bento 第二題情境；'; }
+        if (k === 1 && p.scene === 'noodle' && !qText.includes('乾麵')) { allOk = false; detail += 'noodle 乾麵；'; }
+        await tap(box.locator(`[data-choice=${wrong}]`));
+        const wrongText = await box.innerText();
+        const wrongPrim = await box.locator('.btn-primary:visible').count();
+        if (!(wrongText.includes('再想一想') && wrongText.includes('差別在哪裡') && wrongPrim === 1)) { allOk = false; detail += `${p.scene}${k} 錯誤回饋；`; }
+        await tap(box.locator('.btn-primary[data-eatout-action=reselect]'));
+        if (!(await box.locator(`[data-choice=${wrong}].tried`).count())) { allOk = false; detail += `${p.scene}${k} 未標示已試過；`; }
+        await tap(box.locator(`[data-choice=${right}]`));
+        const okText = await box.innerText();
+        const card = await box.locator(`[data-eatout=${kind}]`).innerText().catch(() => '');
+        if (!(okText.includes('這樣選比較少鹽') && (await box.locator('[data-eatout=why]').count()) === 1 && card.includes(phrase))) { allOk = false; detail += `${p.scene}${k} 正確回饋：${card}；`; }
+        if (p.scene === 'store') {
+          const calcs = await box.locator('[data-calc]').allInnerTexts();
+          if (!(calcs[0]?.includes('150 毫克 × 3 份 = 450 毫克') && calcs[1]?.includes('180 毫克 × 2 份 = 360 毫克'))) { allOk = false; detail += `計算：${calcs.join('／')}；`; }
+        }
+        await tap(box.locator('[data-eatout-action=next]'));
+      }
+      await box.locator(`.eatout-btn[data-scene=${p.scene}].done`).waitFor({ timeout: 5000 }).catch(() => { allOk = false; detail += `${p.scene} 沒有標示練習過；`; });
+    }
+    check(`15b [${w}px] 四種情境：選錯看提示可再選一次，選對後一句話說明差別，並顯示對店家說的話或購買技巧`, allOk, detail);
+    check(`15c [${w}px] 超商：兩張「示範用」虛構營養標示，作答後顯示「每份鈉含量 × 包裝份數」計算過程`, allOk && !detail.includes('store') && !detail.includes('計算'), detail);
+
+    // 口頭回覆示教 → 我練習好了 → 回到餐桌
+    const practiceBtnClass = await box.locator('[data-eatout-action=practice]').getAttribute('class');
+    await tap(box.locator('[data-eatout-action=practice]'));
+    const t = await box.innerText();
+    const inputs = await d.locator('input, textarea, select').count();
+    check(`15d [${w}px] 最後一步：口頭回覆示教問題與句型，不需輸入；四個情境都練習後「說一次」變成主要按鈕`,
+      practiceBtnClass.includes('btn-primary') && t.includes('如果明天要買便當，你會怎麼點？如果店家說沒辦法少鹽，你會怎麼換？') && t.includes('我會請店家＿＿＿。如果不能調整，我會改選＿＿＿。') && inputs === 0 && (await box.locator('.btn-primary:visible').count()) === 1);
+    await tap(box.getByRole('button', { name: '我練習好了', exact: true }));
+    await d.locator('.item-card[data-item=eat-out]').waitFor({ timeout: 10000 });
+    const backText = await d.innerText();
+    const progress1 = await progressNow();
+    check(`15e [${w}px] 按「我練習好了」回到低鹽餐桌；原有任務與進度不變`, backText.includes('本站照護重點') && backText.includes('今天外食，怎麼點？') && backText.includes('哪一餐比較少鹽') && progress0 === progress1, `${progress0} → ${progress1}`);
+    // 再次進入：從選單「回到餐桌」也能返回
+    await tap(d.locator('.item-card[data-item=eat-out]'));
+    await box.waitFor();
+    await tap(box.locator('[data-eatout-action=back]'));
+    check(`15f [${w}px] 情境選單的「回到餐桌」返回 08 站`, (await d.locator('.item-card[data-item=eat-out]').count()) === 1);
+    await ctx.close();
+  }
+
   // ───── 7. 未登入者無法取得院內工作卡連結或內部資料 ─────
   {
     execSync('npx vite build --outDir dist-staff-test --emptyOutDir', { env: { ...process.env, VITE_STAFF_API_BASE: '/staff/api' }, stdio: 'ignore' });

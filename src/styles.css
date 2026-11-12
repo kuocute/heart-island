@@ -370,3 +370,24 @@ body[data-tod='night'] .zone-sign span { color: #c9d4ee; }
 .sdm-note { margin: 8px 0 0; }
 .learn-anchor { scroll-margin-top: 8px; }
 .learn-anchor:focus { outline: 3px solid #1d4ed8; outline-offset: 2px; border-radius: 6px; }
+
+/* 08 低鹽餐桌：今天外食，怎麼點？ */
+.eatout-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.eatout-btn { display: grid; justify-items: center; gap: 4px; min-height: 96px; padding: 12px 8px; border: 2px solid var(--line); border-radius: 16px; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.eatout-btn:hover, .eatout-btn:focus-visible { border-color: var(--teal); }
+.eatout-btn.done { border-color: var(--teal); background: #f1f8f6; }
+.eatout-icon { font-size: 1.8rem; line-height: 1; }
+.eatout-done { font-size: 0.85rem; color: var(--teal); }
+.eatout-question { padding: 12px 14px; }
+.eatout-frame { display: grid; gap: 2px; margin: 12px 0; padding: 10px 14px; border-radius: 12px; background: #eef3fb; }
+.demo-labels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
+.demo-label { border: 2px solid #333; border-radius: 10px; padding: 8px 10px; background: #fff; }
+.demo-label h4 { margin: 4px 0 6px; font-size: 1rem; }
+.demo-label table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.demo-label th, .demo-label td { padding: 3px 0; border-top: 1px solid #ccc; text-align: left; font-weight: 400; }
+.demo-label td { text-align: right; }
+.demo-label .sodium-row th, .demo-label .sodium-row td { font-weight: 700; }
+.demo-badge { display: inline-block; margin: 0; padding: 1px 8px; border-radius: 999px; background: #fff4e5; color: #6b3d00; font-size: 0.8rem; font-weight: 700; }
+.demo-calc { margin: 6px 0 0; font-size: 0.92rem; }
+.demo-note { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 360px) { .demo-labels { grid-template-columns: 1fr; } }

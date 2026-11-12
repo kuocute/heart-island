@@ -583,7 +583,7 @@ export const STATIONS: Station[] = [
     items: [
       { id: 'hidden-salt', title: '看不見的鹽', summary: '醃漬物、加工食品、泡麵、醬料常含較多鹽。', keywords: ['鹽', '鈉', '醬油', '泡麵', '加工食品'], missionId: 'diet-salt' },
       { id: 'flavor', title: '用天然香料調味', summary: '蔥、薑、蒜、檸檬、香草可以增加風味，少用鹽。', keywords: ['調味', '香料', '煮菜'] },
-      { id: 'eat-out', title: '外食小技巧', summary: '湯少喝、醬料另外放、少選醃漬或加工的菜。', keywords: ['外食', '便當', '湯'] },
+      { id: 'eat-out', title: '今天外食，怎麼點？', summary: '便當、麵店、火鍋、超商四個情境：湯少喝、醬料少加、少選醃漬或加工的菜，看懂營養標示。', keywords: ['外食', '便當', '湯', '自助餐', '麵店', '小吃', '火鍋', '超商', '營養標示', '點餐'] },
       { id: 'fluid', title: '喝水量依醫囑', summary: '要不要限制水分、限多少，請依醫師與營養師說明。', keywords: ['喝水', '水分', '限水'] },
     ],
     missions: [
