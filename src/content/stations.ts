@@ -563,6 +563,8 @@ export const STATIONS: Station[] = [
       { id: 'pillbox', title: '整理藥盒', summary: '依藥單把藥分好，放在每天看得到的地方。', keywords: ['藥盒', '分藥', '提醒'] },
       { id: 'missed', title: '忘記吃藥時', summary: '依藥袋或藥師說明處理，不要自己把下一次加倍。', keywords: ['忘記', '漏吃', '補吃'], missionId: 'med-missed' },
       { id: 'otc', title: '其他藥與保健食品', summary: '想吃成藥、止痛藥或保健食品前，先問醫師或藥師。', keywords: ['成藥', '止痛藥', '保健食品', '中藥'] },
+      { id: 'hf-meds', title: '認識我的心衰藥', summary: '四類核心心衰藥（ARNI／ACEi／ARB、乙型阻斷劑、MRA、SGLT2 抑制劑）與排水藥，各自幫什麼、要留意什麼。', keywords: ['心衰藥', '藥物', 'ARNI', 'ACEi', 'ARB', '乙型阻斷劑', 'MRA', 'SGLT2', '利尿劑', '排水藥', 'furosemide'], meta: '藥卡' },
+      { id: 'pharmacy-desk', title: '藥師櫃台：遇到這件事怎麼辦？', summary: '新舊藥袋、想買止痛藥、手術前用藥三個情境，練習怎麼開口問藥師或個管師。', keywords: ['藥師', '藥袋', '止痛藥', 'NSAIDs', '手術', '個管師'], meta: '情境遊戲' },
     ],
     missions: [
       {
