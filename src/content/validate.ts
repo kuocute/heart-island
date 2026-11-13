@@ -28,7 +28,8 @@ export function validateStations(stations: Station[], nodeIds?: Set<string>): st
     if (!s.phases.length) errors.push(`${where}：至少屬於一個照護階段`);
     const itemIds = s.items.map((i) => i.id);
     if (new Set(itemIds).size !== itemIds.length) errors.push(`${where}：照護重點 id 重複`);
-    if (s.items.length < 1 || s.items.length > 4) errors.push(`${where}：照護重點建議 1–4 項（島上小建築的數量）`);
+    // 島上只有 4 個小建築位置（ITEM_SLOTS）：前 4 項有小屋，第 5、6 項只出現在站點視窗的照護重點
+    if (s.items.length < 1 || s.items.length > 6) errors.push(`${where}：照護重點建議 1–6 項（前 4 項會在島上顯示小建築）`);
     if (s.card) {
       if (s.missions.length !== 1 || s.missions[0].interaction !== 'quiz') errors.push(`${where}：有衛教卡的站點只能有一個知識題`);
       if (!s.card.title.trim() || !s.card.summary.trim()) errors.push(`${where}：衛教卡缺少標題或導言`);

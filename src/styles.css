@@ -192,6 +192,24 @@ button, input { font: inherit; color: inherit; }
 .video-status { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: #fff4e5; color: #6b3d00; font-size: 0.95rem; }
 .video-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .video-actions .btn { flex: 1 1 150px; }
+/* 07 用藥小站：認識我的心衰藥、藥師櫃台 */
+.med-group { margin: 14px 0 6px; }
+.med-cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.med-card { background: #fff; border: 1px solid var(--line); border-left: 5px solid var(--teal); border-radius: 12px; padding: 10px 12px; }
+.med-card h4 { margin: 0; }
+.med-card.med-relief { border-left-color: #6b8fd6; border-style: dashed; border-left-style: solid; }
+.med-examples { margin: 2px 0 6px; }
+.med-label { margin: 8px 0 2px; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+.med-text { margin: 0; }
+.med-watch { margin: 0; padding-left: 20px; }
+.med-watch li + li { margin-top: 2px; }
+.desk-title { margin: 6px 0; }
+.demo-bag { margin: 8px 0; padding: 8px 12px; border: 2px dashed #b9a27a; border-radius: 12px; background: #fffaf0; }
+.demo-bag-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #fff4e5; color: #6b3d00; font-size: 0.8rem; font-weight: 700; }
+.demo-bag dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 6px 0 0; font-size: 0.92rem; }
+.demo-bag dt { font-weight: 700; }
+.demo-bag dd { margin: 0; }
+.med-frame { display: grid; gap: 2px; margin: 12px 0; padding: 10px 14px; border-radius: 12px; background: #eef3fb; }
 
 /* 醫療人員卡 */
 .staff-card { background: #f4f7fb; border: 1px solid #cdd9e8; border-radius: 14px; padding: 12px 14px; margin-top: 8px; }

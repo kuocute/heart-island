@@ -681,6 +681,79 @@ try {
     execSync('rm -rf dist-portal-test dist-bad-test');
   }
 
+  // ───── 16. 07 用藥小站：認識我的心衰藥、藥師櫃台（情境遊戲 → 口頭練習 → 返回） ─────
+  for (const [w, hgt, touch, roleName] of [[390, 844, true, 'patient'], [1280, 800, false, 'caregiver']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
+    await page.goto(BASE);
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, roleName);
+    const tap = (loc) => (touch ? loc.tap() : loc.click());
+    const d = dialog(page);
+    const box = d.locator('.med-station');
+    const prog = () => page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.medication ?? null));
+    await page.locator('.map-label[data-station=medication]').evaluate((el) => el.click());
+    await d.waitFor({ timeout: 90000 });
+    const items = await d.locator('.item-card .item-title').allInnerTexts();
+    const missions = await d.locator('.mission-pick-title').allInnerTexts();
+    const p0 = await prog();
+    check(`16a [${w}px] 從地圖進 07：保留原有四張照護重點與兩個任務，新增「認識我的心衰藥」「藥師櫃台」`,
+      JSON.stringify(items) === JSON.stringify(['不自行停藥', '整理藥盒', '忘記吃藥時', '其他藥與保健食品', '認識我的心衰藥', '藥師櫃台：遇到這件事怎麼辦？'])
+      && JSON.stringify(missions) === JSON.stringify(['1. 覺得好多了可以停藥嗎', '2. 忘記吃藥怎麼辦']), items.join('／'));
+    // 藥卡
+    await tap(d.locator('.item-card[data-item=hf-meds]'));
+    await box.locator('[data-med-group=core]').waitFor();
+    const core = await box.locator('[data-med-group=core] .med-card > h4').allInnerTexts();
+    const relief = await box.locator('[data-med-group=relief] .med-card').innerText();
+    const labelsOk = await box.locator('.med-card').evaluateAll((cards) => cards.every((c) => [...c.querySelectorAll('.med-label')].map((x) => x.textContent).join('|') === '這類藥幫我什麼|用藥期間要留意什麼'));
+    const note = await box.locator('[data-med=note]').innerText();
+    check(`16b [${w}px] 藥卡：四類核心用藥各兩段，排水藥獨立一張，註明依個人處方`,
+      JSON.stringify(core) === JSON.stringify(['ARNI／ACEi／ARB', '乙型阻斷劑', 'MRA', 'SGLT2 抑制劑']) && labelsOk && relief.includes('furosemide') && relief.includes('緩解水分堆積') && note.includes('依個人處方及團隊指示') && (await box.locator('.btn-primary:visible').count()) === 1, core.join('／'));
+    await tap(box.locator('[data-med-action=back]'));
+    await d.locator('.item-card[data-item=pharmacy-desk]').waitFor();
+    check(`16c [${w}px] 藥卡「回到用藥小站」返回 07`, (await d.locator('.item-card').count()) === 6);
+    // 藥師櫃台
+    await tap(d.locator('.item-card[data-item=pharmacy-desk]'));
+    const plan = [['finish-old', 'check', '哪一包停用？新藥什麼時候開始吃？', ''], ['ad', 'show-list', '我有心衰竭', 'ibuprofen'], ['self-stop', 'tell-early', '什麼時候要先停', 'SGLT2']];
+    let ok = true, detail = '';
+    for (const [i, [wrong, right, sayHas, whyHas]] of plan.entries()) {
+      await box.locator(`[data-choice=${wrong}]`).waitFor();
+      const q = await box.innerText();
+      if (!q.includes(`（${i + 1}／3）`) || !q.includes('我會怎麼做？')) { ok = false; detail += `第${i + 1}題標題；`; }
+      if (i === 2 && !(await box.locator('[data-med=demo-bag]').innerText()).includes('示範用藥袋・虛構')) { ok = false; detail += '虛構藥袋；'; }
+      await tap(box.locator(`[data-choice=${wrong}]`));
+      const fw = await box.innerText();
+      const retryPrimary = (await box.locator('[data-med-action=retry]').getAttribute('class')).includes('btn-primary');
+      if (!(fw.includes('再想一想') && fw.includes('原因：') && (await box.locator('[data-med=say]').count()) === 1 && retryPrimary && (await box.locator('[data-med-action=next]').count()) === 1)) { ok = false; detail += `第${i + 1}題錯誤回饋；`; }
+      await tap(box.locator('[data-med-action=retry]'));
+      if (!(await box.locator(`[data-choice=${wrong}].tried`).count())) { ok = false; detail += `第${i + 1}題未標示已試過；`; }
+      await tap(box.locator(`[data-choice=${right}]`));
+      const why = await box.locator('[data-med=why]').innerText();
+      const say = await box.locator('[data-med=say]').innerText();
+      const nextPrimary = (await box.locator('[data-med-action=next]').getAttribute('class')).includes('btn-primary');
+      if (!((await box.innerText()).includes('這樣做比較安全') && say.includes(sayHas) && why.includes(whyHas) && nextPrimary)) { ok = false; detail += `第${i + 1}題正確回饋：${say}；`; }
+      if (i === 1 && !(why.includes('NSAIDs') && why.includes('留住水分'))) { ok = false; detail += 'NSAIDs 說明；'; }
+      await tap(box.locator('[data-med-action=next]'));
+    }
+    check(`16d [${w}px] 藥師櫃台三個情境：選錯看提示「再試一次」，選對看一句原因與開口的話，再「下一題」`, ok, detail);
+    // 口頭回覆示教
+    await box.locator('[data-med-action=practiced]').waitFor();
+    const t = await box.innerText();
+    check(`16e [${w}px] 口頭回覆示教：問題與句型，不需輸入`,
+      t.includes('如果出院後發現新舊藥袋都還在，你會帶什麼去找誰？你會問哪一句？') && t.includes('我會帶＿＿＿去找＿＿＿，請他幫我確認＿＿＿。') && (await d.locator('input, textarea, select').count()) === 0 && (await box.locator('.btn-primary:visible').count()) === 1);
+    await tap(box.getByRole('button', { name: '我練習好了', exact: true }));
+    await d.locator('.item-card[data-item=pharmacy-desk]').waitFor({ timeout: 10000 });
+    const back = await d.innerText();
+    const p1 = await prog();
+    check(`16f [${w}px] 按「我練習好了」回到用藥小站；原有任務與進度不變`, back.includes('本站照護重點') && back.includes('覺得好多了可以停藥嗎') && p0 === p1, `${p0} → ${p1}`);
+    // 原有練習仍可進行（忘記吃藥怎麼辦）
+    await tap(d.locator('.item-card[data-item=missed]'));
+    const missedText = await d.innerText();
+    check(`16g [${w}px] 原有「忘記吃藥時」照護重點與練習入口不變`, missedText.includes('不要自己把下一次加倍') && missedText.includes('練習這一題'));
+    await ctx.close();
+  }
+
   // ───── 12. 14 進階心衰醫療港：醫病共享決策（SDM）引導卡 ─────
   for (const [w, hgt, touch] of [[390, 844, true], [1280, 800, false]]) {
     const SDM = 'https://apps.chimei.org.tw/sdm/survey_doit.aspx?X=c6zuS';

@@ -123,6 +123,8 @@ export type Item = {
   keywords: string[];
   /** 對應的練習任務 id（同一站） */
   missionId?: string;
+  /** 照護重點卡片右下的小標（預設：可練習／說明） */
+  meta?: string;
 };
 
 export type StaffCard = {

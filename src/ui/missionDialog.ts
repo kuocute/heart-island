@@ -2,6 +2,7 @@
 // 有衛教卡的站（返家照護站）：讀衛教卡 → 情境練習 → 看回饋與原因（答錯可重試）→ 答對即完成。
 // 一次只呈現目前一步；知識題正誤同時用文字表示；照護偏好題不計分、不儲存選項。
 import { CARE_LINKS } from '../content/links';
+import { isMedStationItem, renderMedStation } from './medStation';
 import { EMBED_ORIGIN, STATION_VIDEO, embedUrl, playerErrorText, youtubeId } from '../content/videos';
 import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId, TeamMission } from '../content/types';
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
@@ -94,7 +95,15 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
     switch (step.kind) {
       case 'intro': renderIntro(step); break;
       case 'card': renderCard(); break;
-      case 'item': renderItem(step.itemId); break;
+      case 'item':
+        // 07 用藥小站：藥卡與藥師櫃台情境遊戲在同一個視窗內切換
+        if (isMedStationItem(station.id, step.itemId)) {
+          const box = h('div', { class: 'med-station' });
+          view.append(box);
+          renderMedStation({ container: box, live, itemId: step.itemId, onBack: (done) => { go({ kind: 'intro', tab: 'practice' }); if (done) announce(live, '練習好了，回到用藥小站。'); } });
+          break;
+        }
+        renderItem(step.itemId); break;
       case 'scenario': renderScenario(step.i); break;
       case 'choose': renderChoose(step); break;
       case 'feedback': renderFeedback(step); break;
@@ -180,7 +189,7 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
         h('button', { type: 'button', class: 'item-card', 'data-item': it.id, onclick: () => go({ kind: 'item', itemId: it.id }) },
           h('span', { class: 'item-no', 'aria-hidden': 'true' }, String(i + 1)),
           h('span', { class: 'item-title' }, it.title),
-          h('span', { class: 'item-meta' }, it.missionId ? (practiced(station.missions[missionIndex(it.missionId)]) ? '已練習' : '可練習') : '說明'))))),
+          h('span', { class: 'item-meta' }, it.meta ?? (it.missionId ? (practiced(station.missions[missionIndex(it.missionId)]) ? '已練習' : '可練習') : '說明')))))),
     );
     if (station.pickMission) panel.append(h('p', { class: 'pick-prompt' }, station.pickMission.prompt));
     panel.append(h('h4', {}, station.pickMission ? '展館' : '練習任務'),
