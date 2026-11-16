@@ -6,6 +6,7 @@ import { isMedStationItem, renderMedStation } from './medStation';
 import { EMBED_ORIGIN, STATION_VIDEO, embedUrl, playerErrorText, youtubeId } from '../content/videos';
 import type { Item, LearnerRole, Mission, Prop, Role, Station, StationId, TeamMission } from '../content/types';
 import { STATUS_TEXT, stationStatus, type ProgressStore } from '../state/progress';
+import { isWarningStation, renderWarningTop } from './warningSigns';
 import { announce, h, openModal, type ModalHandle } from './modal';
 import { renderStaffCard } from './staffCard';
 import { renderPortalEntry } from './portalEntry';
@@ -165,6 +166,8 @@ export function openMissionDialog(o: MissionDialogOptions): ModalHandle {
       view.append(panel);
       return;
     }
+    // 「10｜警訊燈塔」最上方：紅燈、黃燈、每天自我檢查、警訊練習（不影響進度）
+    if (isWarningStation(station.id)) panel.append(renderWarningTop({ live }));
     // 「14｜進階心衰醫療港」最上方：醫病共享決策引導卡（只提供入口，不影響進度）
     const learnId = `learn-${station.id}`;
     if (station.id === SDM_CARD.station) {
