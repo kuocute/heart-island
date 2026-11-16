@@ -681,6 +681,114 @@ try {
     execSync('rm -rf dist-portal-test dist-bad-test');
   }
 
+  // ───── 17. 10 警訊燈塔：紅燈首屏、黃燈、每天自我檢查、完整圖卡放大、警訊練習 ─────
+  for (const [w, hgt, touch, roleName] of [[390, 844, true, 'caregiver'], [1280, 800, false, 'patient']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => check('沒有頁面錯誤', false, e.message));
+    await page.goto(BASE);
+    await page.waitForSelector('body[data-ready=true]');
+    await startAs(page, roleName);
+    const tap = (loc) => (touch ? loc.tap() : loc.click());
+    const d = dialog(page);
+    const prog = () => page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('hf-care-island:v1') ?? '{}').stations?.warning ?? null));
+    await page.locator('.map-label[data-station=warning]').evaluate((el) => el.click());
+    await d.waitFor({ timeout: 90000 });
+    await page.waitForTimeout(800);
+    const p0 = await prog();
+    // 首屏：紅燈標題、六項警訊（文字＋圖示）、119 行動提醒都在視窗內，不必捲動
+    const red = d.locator('[data-signal=red]');
+    const redTitle = await red.locator('.signal-title').innerText();
+    const redItems = await red.locator('.signal-list li').evaluateAll((lis) => lis.map((li) => ({ icon: li.querySelector('.signal-icon')?.textContent?.trim() ?? '', text: li.innerText.trim() })));
+    const action = d.locator('[data-signal=red-action]');
+    const ab = await action.boundingBox();
+    const scrolled = await d.locator('.modal-body').evaluate((b) => b.scrollTop);
+    const focused = await page.evaluate(() => document.activeElement?.id);
+    check(`17a [${w}px] 從地圖進 10：首屏不必捲動就看到紅燈六項警訊（文字＋圖示）與「立即撥打 119，依派遣員指示處理」`,
+      redTitle.includes('紅燈') && redTitle.includes('立即撥打 119') && redItems.length === 6 && redItems.every((x) => x.icon && x.text)
+      && ['嚴重呼吸困難', '喘到說不完一句話', '胸痛', '昏倒或意識不清', '嘴唇發紫', '咳粉紅色泡沫痰'].every((k) => redItems.some((x) => x.text.includes(k)))
+      && (await action.innerText()).includes('立即撥打 119，依派遣員指示處理') && ab && ab.y + ab.height <= hgt && scrolled === 0 && focused === 'signal-red-title',
+      `bottom=${ab && Math.round(ab.y + ab.height)} scroll=${scrolled} focus=${focused}`);
+    // 黃燈
+    const y = d.locator('[data-signal=yellow]');
+    const yText = await y.innerText();
+    const yIcons = await y.locator('.signal-list .signal-icon').count();
+    check(`17b [${w}px] 黃燈：五個例子（文字＋圖示）、行動提醒，體重門檻與電話標示待團隊核定`,
+      yText.includes('黃燈') && yText.includes('今天聯絡照護團隊') && yIcons === 5 && ['體重比平常明顯增加', '走路比平常喘', '夜間喘醒', '腳腫或腹脹加劇', '尿量明顯減少'].every((k) => yText.includes(k))
+      && yText.includes('請依個人出院照護計畫行動，用藥有疑問先聯絡團隊') && yText.includes('待照護團隊核定後填入') && !/\d+\s*公斤/.test(yText));
+    // 每天自我檢查：六張可展開短卡
+    const titles = await d.locator('.check-card .check-title').allInnerTexts();
+    const closedBefore = await d.locator('.check-card[open]').count();
+    await tap(d.locator('[data-check=weight] summary'));
+    const weight = await d.locator('[data-check=weight]').innerText();
+    await tap(d.locator('[data-check=edema] summary'));
+    const edema = await d.locator('[data-check=edema]').innerText();
+    check(`17c [${w}px] 每天自我檢查：六張短卡預設收合，可展開；體重卡寫明測量方式`,
+      JSON.stringify(titles) === JSON.stringify(['體重', '呼吸', '水腫', '血壓與心跳', '尿量', '用藥']) && closedBefore === 0
+      && weight.includes('起床排尿後、早餐前，用同一台體重計，穿相近衣著測量') && edema.includes('鞋子變緊'));
+    // 完整衛教圖卡：開啟、放大、縮小、原圖連結、關閉回到本站
+    await tap(d.locator('[data-signal=open-card]'));
+    const v = page.locator('.modal.card-viewer');
+    await v.locator('[data-card=image]').waitFor();
+    await page.waitForFunction(() => { const i = document.querySelector('[data-card=image]'); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 30000 });
+    const stageW = await v.locator('[data-card=stage]').evaluate((s) => s.clientWidth);
+    const w1 = await v.locator('[data-card=image]').evaluate((i) => i.getBoundingClientRect().width);
+    await tap(v.locator('[data-card=zoom-in]'));
+    await tap(v.locator('[data-card=zoom-in]'));
+    const w2 = await v.locator('[data-card=image]').evaluate((i) => i.getBoundingClientRect().width);
+    const lvl = await v.locator('[data-card=level]').innerText();
+    const scrollable = await v.locator('[data-card=stage]').evaluate((s) => s.scrollWidth > s.clientWidth);
+    await tap(v.locator('[data-card=zoom-out]'));
+    const lvl2 = await v.locator('[data-card=level]').innerText();
+    const href = await v.locator('[data-card=original]').getAttribute('href');
+    const draft = await v.locator('[data-card=draft]').innerText();
+    let pinch = 'skip';
+    if (touch) {
+      // 雙指縮放（CDP 觸控事件）：兩指張開後放大
+      const sb = await v.locator('[data-card=stage]').boundingBox();
+      const cdp = await ctx.newCDPSession(page);
+      const cx = sb.x + sb.width / 2, cy = sb.y + sb.height / 2;
+      const tp = (dx) => [{ x: cx - dx, y: cy, id: 1 }, { x: cx + dx, y: cy, id: 2 }];
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: tp(30) });
+      for (const dx of [50, 70, 90, 110]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: tp(dx) });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      pinch = await v.locator('[data-card=level]').innerText();
+    }
+    await page.keyboard.press('Escape');
+    await v.waitFor({ state: 'detached', timeout: 10000 });
+    const stillOpen = (await d.getAttribute('data-station')) === 'warning';
+    check(`17d [${w}px] 完整衛教圖卡：可放大到 200%、可捲動、可縮小${touch ? '、雙指放大' : ''}，有原圖連結與參考版說明，關閉後回到 10 站`,
+      Math.abs(w1 - stageW) < 3 && Math.abs(w2 - 2 * stageW) < 6 && lvl === '200%' && scrollable && lvl2 === '150%' && href.endsWith('assets/warning-card.webp') && draft.includes('參考版') && stillOpen
+      && (pinch === 'skip' || pinch !== '150%'), `w1=${w1} stage=${stageW} w2=${w2} ${lvl} ${lvl2} pinch=${pinch}`);
+    // 警訊練習三題：答錯可重試，選完即顯示原因；119 只顯示回饋
+    const plan = [['call119', 'observe'], ['observe', 'contact'], ['contact', 'call119']];
+    let ok = true, detail = '';
+    const url0 = page.url();
+    for (const [k, [wrong, right]] of plan.entries()) {
+      await d.locator(`[data-triage=${wrong}]`).waitFor();
+      if (!(await d.locator('[data-drill=count]').innerText()).includes(`第 ${k + 1}／3 題`)) { ok = false; detail += `第${k + 1}題題號；`; }
+      await tap(d.locator(`[data-triage=${wrong}]`));
+      const fb = await d.locator('[data-drill=feedback]').innerText();
+      if (!(fb.includes('再想一想') && fb.length > 15 && (await d.locator('[data-drill=retry]').count()) === 1 && (await d.locator('[data-drill=next]').count()) === 0)) { ok = false; detail += `第${k + 1}題錯誤回饋；`; }
+      await tap(d.locator('[data-drill=retry]'));
+      await tap(d.locator(`[data-triage=${right}]`));
+      const fb2 = await d.locator('[data-drill=feedback]').innerText();
+      if (!fb2.includes('答對了')) { ok = false; detail += `第${k + 1}題正確回饋；`; }
+      if (k < 2) await tap(d.locator('[data-drill=next]'));
+    }
+    const done = await d.locator('[data-drill=done]').count();
+    const telLinks = await page.locator('a[href^="tel:"]').count();
+    const q3 = await d.locator('[data-drill=feedback]').innerText();
+    check(`17e [${w}px] 警訊練習三題（觀察／今天聯絡／119）：選完即顯示原因，答錯可「再試一次」；選 119 只顯示回饋，不撥號`,
+      ok && done === 1 && telLinks === 0 && page.url() === url0 && q3.includes('不會真的撥打'), detail);
+    // 原有照護重點、任務與進度不變
+    const items = await d.locator('.item-card .item-title').allInnerTexts();
+    const missions = await d.locator('.mission-pick-title').allInnerTexts();
+    check(`17f [${w}px] 原有照護重點與任務保留，進度不變`,
+      JSON.stringify(items) === JSON.stringify(['說清楚變化', '找到求助方式', '家屬觀察分工']) && missions.length === 3 && p0 === (await prog()), items.join('／'));
+    await ctx.close();
+  }
+
   // ───── 16. 07 用藥小站：認識我的心衰藥、藥師櫃台（情境遊戲 → 口頭練習 → 返回） ─────
   for (const [w, hgt, touch, roleName] of [[390, 844, true, 'patient'], [1280, 800, false, 'caregiver']]) {
     const ctx = await browser.newContext({ viewport: { width: w, height: hgt }, deviceScaleFactor: 2, hasTouch: touch });
